@@ -177,9 +177,23 @@ class MainWindow(QMainWindow):
         sb_lay.setContentsMargins(12, 20, 12, 14)
         sb_lay.setSpacing(3)
 
+        brand_row = QHBoxLayout()
+        brand_row.setSpacing(10)
+        if not self.app_icon.isNull():
+            logo_lbl = QLabel()
+            logo_lbl.setPixmap(self.app_icon.pixmap(28, 28))
+            brand_row.addWidget(logo_lbl)
         brand = QLabel("OPTIMASI")
         brand.setObjectName("BrandTitle")
-        sb_lay.addWidget(brand)
+        brand_row.addWidget(brand)
+        pro_pill = QLabel("PRO")
+        pro_pill.setStyleSheet(
+            "background-color: rgba(56, 189, 248, 0.16); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.35); "
+            "border-radius: 5px; padding: 1px 6px; font-size: 9px; font-weight: 800;"
+        )
+        brand_row.addWidget(pro_pill)
+        brand_row.addStretch()
+        sb_lay.addLayout(brand_row)
         sub = QLabel(f"Windows Suite • v{APP_VERSION}")
         sub.setObjectName("BrandSub")
         sb_lay.addWidget(sub)
@@ -241,7 +255,8 @@ class MainWindow(QMainWindow):
         h_lay.addWidget(self.dry_switch)
 
         admin_ok = is_admin()
-        self.admin_btn = QPushButton("ADMIN AKTIF" if admin_ok else "ELEVATE (ADMIN)")
+        self.admin_btn = QPushButton(" ADMIN AKTIF" if admin_ok else " ELEVATE (ADMIN)")
+        self.admin_btn.setIcon(svg_icon("shield", "#34D399" if admin_ok else "#FBBF24", 14))
         self.admin_btn.setObjectName("SuccessBtn" if admin_ok else "WarningBtn")
         self.admin_btn.clicked.connect(self._on_elevate if not admin_ok else lambda: self.show_toast("Sudah berjalan dengan hak Administrator.", "success"))
         h_lay.addWidget(self.admin_btn)

@@ -166,6 +166,12 @@ class DashboardView(QWidget):
         self.preset_grid = QGridLayout()
         self.preset_grid.setSpacing(14)
         self.preset_cards: dict[str, QFrame] = {}
+        preset_icons = {
+            "laptop_pro": "cpu",
+            "laptop_battery": "shield",
+            "gaming_pro": "zap",
+            "safe_daily": "check",
+        }
         for idx, preset in enumerate(PRESETS):
             pcard = QFrame()
             pcard.setObjectName("FeaturedPresetCard" if preset.id == "laptop_pro" else "Card")
@@ -173,9 +179,16 @@ class DashboardView(QWidget):
             play.setContentsMargins(18, 16, 18, 16)
             play.setSpacing(8)
 
+            badge_row = QHBoxLayout()
+            badge_row.setSpacing(6)
+            b_ico = QLabel()
+            b_ico.setPixmap(svg_icon(preset_icons.get(preset.id, "sparkles"), "#38BDF8", 14).pixmap(14, 14))
+            badge_row.addWidget(b_ico)
             badge = QLabel(preset.badge)
             badge.setStyleSheet("color: #38BDF8; font-size: 10px; font-weight: 700; letter-spacing: 0.8px;")
-            play.addWidget(badge)
+            badge_row.addWidget(badge)
+            badge_row.addStretch()
+            play.addLayout(badge_row)
 
             pname = QLabel(preset.name)
             pname.setStyleSheet("color: #FAFAFA; font-size: 15px; font-weight: 700;")
@@ -357,8 +370,10 @@ class RamOptimizerView(QWidget):
         )
         self.mem_bar.set_ratios(mem["used_gb"], mem["cached_gb"], mem["total_gb"])
         self.ram_legend.setText(
-            f"Active: {mem['used_gb']} GB  •  Standby/Cache: {mem['cached_gb']} GB  •  "
-            f"Free: {mem['free_gb']} GB  •  Commit: {mem['commit_used_gb']} / {mem['commit_total_gb']} GB"
+            f"<span style='color:#38BDF8;'>●</span> Active: <b>{mem['used_gb']} GB</b>  •  "
+            f"<span style='color:#8B5CF6;'>●</span> Standby/Cache: <b>{mem['cached_gb']} GB</b>  •  "
+            f"<span style='color:#71717A;'>●</span> Free: <b>{mem['free_gb']} GB</b>  •  "
+            f"Commit: {mem['commit_used_gb']} / {mem['commit_total_gb']} GB"
         )
 
         rows = get_top_processes(18)

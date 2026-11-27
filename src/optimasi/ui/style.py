@@ -305,6 +305,24 @@ QCheckBox::indicator:checked {
     background-color: #0EA5E9;
     border-color: #38BDF8;
 }
+
+QPushButton {
+    outline: none;
+}
+
+QTableWidget::item {
+    outline: none;
+    padding: 4px 8px;
+}
+
+QToolTip {
+    background-color: #181824;
+    color: #FAFAFA;
+    border: 1px solid #2E2E3E;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+}
 """
 
 

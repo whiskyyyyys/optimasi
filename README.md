@@ -1,4 +1,4 @@
-# Optimasi Windows v2.1.0 (Python 3.11 + Nuitka + Windows Installer)
+# Optimasi Windows v2.1.1 (Python 3.11 + Nuitka + Windows Installer)
 
 Aplikasi desktop **Windows 10/11** bergaya **Obsidian Dark Fluent (PySide6)** dengan ikon vektor SVG untuk optimasi performa laptop & PC, **Deep RAM Optimizer & Auto-RAM Guard**, gaming FPS, emulator (MuMuPlayer/BlueStacks/LDPlayer), latensi jaringan, privasi/AI debloat, pembersihan cache, serta perbaikan sistem.
 

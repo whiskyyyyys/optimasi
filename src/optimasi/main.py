@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from optimasi import APP_NAME, APP_VERSION
-from optimasi.core.admin import is_admin, is_compiled
+from optimasi.core.admin import is_admin, is_compiled, relaunch_as_admin
 from optimasi.core.cleaner import scan_junk
 from optimasi.core.executor import TweakExecutor
 from optimasi.core.health_score import evaluate_optimization_score
@@ -125,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="optimasi", description=f"{APP_NAME} v{APP_VERSION}")
     parser.add_argument("--version", action="store_true", help="Print version and Python runtime info")
     parser.add_argument("--dry-run", action="store_true", help="Start GUI with Dry-Run mode enabled")
+    parser.add_argument("--no-elevate", action="store_true", help="Do not auto-prompt UAC elevation on startup")
     parser.add_argument("--check-update", action="store_true", help="Check GitHub Releases for updates and exit")
     parser.add_argument("--self-test", action="store_true", help="Run non-destructive offline self-test and exit")
     parser.add_argument("--self-test-out", type=str, default=None, help="Write self-test JSON report to path")
@@ -149,6 +150,11 @@ def main(argv: list[str] | None = None) -> int:
         report = run_self_test(args.self_test_out)
         print(json.dumps(report, indent=2))
         return 0 if (report["dry_run_ok"] and report["pyside6_ok"] and report["gui_init_ok"]) else 1
+
+    if not args.no_elevate and not is_admin():
+        extra = ["--dry-run"] if args.dry_run else []
+        if relaunch_as_admin(extra_args=extra):
+            return 0
 
     sys.excepthook = _log_fatal_crash
     _acquire_single_instance_mutex()

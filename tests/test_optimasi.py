@@ -240,3 +240,10 @@ def test_ram_optimizer_deep_clean_and_details() -> None:
 
     ok_trim, msg_trim = trim_single_process(os.getpid(), dry_run=True)
     assert ok_trim and "[DRY-RUN]" in msg_trim
+
+
+def test_admin_relaunch_helper_callable() -> None:
+    from optimasi.core.admin import is_admin, relaunch_as_admin
+
+    assert isinstance(is_admin(), bool)
+    assert callable(relaunch_as_admin)
