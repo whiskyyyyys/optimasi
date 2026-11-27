@@ -33,6 +33,7 @@ from optimasi.core.backup import create_restore_point, export_registry_backup, r
 from optimasi.core.booster import GameBooster, set_laptop_thermal_mode
 from optimasi.core.cleaner import clean_junk, run_system_repair, scan_junk
 from optimasi.core.executor import TweakExecutor
+from optimasi.core.game_profiles import apply_game_windows_boost, apply_roblox_fflags, clean_roblox_cache, revert_roblox_fflags
 from optimasi.core.health_score import evaluate_optimization_score
 from optimasi.core.ram_optimizer import clean_ram_deep, purge_standby_list, trim_single_process
 from optimasi.core.system_info import get_net_io_counters, get_system_snapshot, terminate_process
@@ -57,6 +58,7 @@ from optimasi.ui.views import (
     CategoryView,
     CleanerView,
     DashboardView,
+    GameProfilesView,
     RamOptimizerView,
 )
 
@@ -107,6 +109,7 @@ class MainWindow(QMainWindow):
     NAV_ITEMS = [
         ("dashboard", "home", "Dashboard"),
         ("ram", "memory", "RAM Optimizer"),
+        ("games", "gamepad", "Game Profiles & Roblox"),
         ("booster", "zap", "Game & Laptop Booster"),
         ("CPU & Power", "cpu", "CPU & Power"),
         ("GPU & Gaming", "gamepad", "GPU & Gaming"),
@@ -329,6 +332,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.dashboard_view = DashboardView(self)
         self.ram_view = RamOptimizerView(self)
+        self.games_view = GameProfilesView(self)
         self.booster_view = BoosterView(self)
         self.category_view = CategoryView(self)
         self.cleaner_view = CleanerView(self)
@@ -336,6 +340,7 @@ class MainWindow(QMainWindow):
 
         self.stack.addWidget(self.dashboard_view)
         self.stack.addWidget(self.ram_view)
+        self.stack.addWidget(self.games_view)
         self.stack.addWidget(self.booster_view)
         self.stack.addWidget(self.category_view)
         self.stack.addWidget(self.cleaner_view)
@@ -511,6 +516,9 @@ class MainWindow(QMainWindow):
         elif page_id == "ram":
             self.ram_view.refresh_ram_view()
             self.stack.setCurrentWidget(self.ram_view)
+        elif page_id == "games":
+            self.games_view.refresh_status()
+            self.stack.setCurrentWidget(self.games_view)
         elif page_id == "booster":
             self.booster_view.refresh_processes()
             self.stack.setCurrentWidget(self.booster_view)
@@ -938,6 +946,46 @@ class MainWindow(QMainWindow):
             "Revert Session",
             lambda log_fn: revert_session(path, dry_run=self.dry_run, log_cb=log_fn),
             on_done=lambda res: (on_done(), self.show_toast(res[1], "success" if res[0] else "warning")),
+        )
+
+    def apply_roblox_profile_async(self, profile_key: str) -> None:
+        dry = self.dry_run
+
+        def _work(log_fn):
+            ok1, m1 = apply_roblox_fflags(profile_key=profile_key, dry_run=dry)
+            ok2, m2 = apply_game_windows_boost("roblox", dry_run=dry)
+            log_fn(m1)
+            log_fn(m2)
+            return ok1 and ok2, m1
+
+        self._run_bg(
+            f"Roblox {profile_key}",
+            _work,
+            on_done=lambda res: (self.games_view.refresh_status(), self.show_toast(res[1], "success" if res[0] else "warning")),
+        )
+
+    def revert_roblox_profile_async(self) -> None:
+        dry = self.dry_run
+        self._run_bg(
+            "Restore Roblox",
+            lambda log_fn: revert_roblox_fflags(dry_run=dry),
+            on_done=lambda res: (self.games_view.refresh_status(), self.show_toast(res[1], "info")),
+        )
+
+    def clean_roblox_cache_async(self) -> None:
+        dry = self.dry_run
+        self._run_bg(
+            "Clean Roblox Cache",
+            lambda log_fn: clean_roblox_cache(dry_run=dry, log_cb=log_fn),
+            on_done=lambda res: self.show_toast(f"Cache Roblox dibersihkan: {res[0]} file (~{res[1]} MB)", "success"),
+        )
+
+    def boost_game_profile_async(self, profile_id: str) -> None:
+        dry = self.dry_run
+        self._run_bg(
+            f"Boost {profile_id}",
+            lambda log_fn: apply_game_windows_boost(profile_id, dry_run=dry),
+            on_done=lambda res: self.show_toast(res[1], "success" if res[0] else "warning"),
         )
 
 

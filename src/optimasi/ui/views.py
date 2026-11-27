@@ -167,6 +167,7 @@ class DashboardView(QWidget):
         self.preset_grid.setSpacing(14)
         self.preset_cards: dict[str, QFrame] = {}
         preset_icons = {
+            "advan_roblox_gaming": "gamepad",
             "laptop_pro": "cpu",
             "laptop_battery": "shield",
             "gaming_pro": "zap",
@@ -174,7 +175,7 @@ class DashboardView(QWidget):
         }
         for idx, preset in enumerate(PRESETS):
             pcard = QFrame()
-            pcard.setObjectName("FeaturedPresetCard" if preset.id == "laptop_pro" else "Card")
+            pcard.setObjectName("FeaturedPresetCard" if preset.id == "advan_roblox_gaming" else "Card")
             play = QVBoxLayout(pcard)
             play.setContentsMargins(18, 16, 18, 16)
             play.setSpacing(8)
@@ -200,12 +201,17 @@ class DashboardView(QWidget):
             play.addWidget(pdesc, 1)
 
             btn = QPushButton(f"Apply {preset.name}")
-            btn.setObjectName("PrimaryBtn" if preset.id in ("laptop_pro", "gaming_pro") else "SuccessBtn")
+            btn.setObjectName("PrimaryBtn" if preset.id in ("advan_roblox_gaming", "laptop_pro", "gaming_pro") else "SuccessBtn")
             btn.clicked.connect(lambda _=False, pid=preset.id, nm=preset.name: self.ctrl.run_preset(pid, nm))
             play.addWidget(btn)
 
             self.preset_cards[preset.id] = pcard
-            self.preset_grid.addWidget(pcard, idx // 2, idx % 2)
+            if idx == 0:
+                self.preset_grid.addWidget(pcard, 0, 0, 1, 2)
+            else:
+                r = 1 + (idx - 1) // 2
+                c = (idx - 1) % 2
+                self.preset_grid.addWidget(pcard, r, c)
 
         lay.addLayout(self.preset_grid)
         lay.addStretch()
@@ -401,6 +407,130 @@ class RamOptimizerView(QWidget):
             btn_kill.clicked.connect(lambda _=False, pid=proc["pid"]: self.ctrl.kill_process(pid, on_done=self.refresh_ram_view))
             clay.addWidget(btn_kill)
             self.ram_table.setCellWidget(r, 4, cell)
+
+
+class GameProfilesView(QWidget):
+    """Dedicated ADVAN 1701 Game Profiles, Roblox Pro Optimizer & Recommended Games Guide."""
+
+    def __init__(self, app_ctrl):
+        super().__init__()
+        self.ctrl = app_ctrl
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        body = QWidget()
+        lay = QVBoxLayout(body)
+        lay.setContentsMargins(24, 20, 24, 24)
+        lay.setSpacing(16)
+
+        # 1. Roblox Pro Optimizer Hero Card
+        rcard = QFrame()
+        rcard.setObjectName("HeroCard")
+        rlay = QVBoxLayout(rcard)
+        rlay.setContentsMargins(20, 18, 20, 18)
+        rlay.setSpacing(10)
+
+        rhdr = QHBoxLayout()
+        rhdr.addWidget(QLabel("Roblox Pro Optimizer (Khusus ADVAN 1701 / Radeon 660M)", styleSheet="font-size: 16px; font-weight: 700; color: #38BDF8;"))
+        rhdr.addStretch()
+        self.roblox_status_pill = QLabel("Mendeteksi Roblox...")
+        self.roblox_status_pill.setStyleSheet("background-color: rgba(56, 189, 248, 0.14); color: #38BDF8; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 700;")
+        rhdr.addWidget(self.roblox_status_pill)
+        rlay.addLayout(rhdr)
+
+        rlay.addWidget(
+            QLabel(
+                "Optimasi FFlags Roblox (ClientAppSettings.json): paksa D3D11, target 120/240 FPS, matikan PostFx & shadow berat, "
+                "prioritas GPU High Performance & CPU High Priority — bikin main Blox Fruits, Anime Defenders, & map berat tetap mulus.",
+                styleSheet="color: #A1A1AA; font-size: 12px;",
+                wordWrap=True,
+            )
+        )
+
+        rbtns = QHBoxLayout()
+        rbtns.setSpacing(8)
+        b_smooth = QPushButton(" Smooth 120 FPS (Recommended)")
+        b_smooth.setIcon(svg_icon("gamepad", "#030712", 15))
+        b_smooth.setObjectName("PrimaryBtn")
+        b_smooth.clicked.connect(lambda: self.ctrl.apply_roblox_profile_async("smooth_660m"))
+        rbtns.addWidget(b_smooth)
+
+        b_ultra = QPushButton(" Ultra FPS 240 Cap (Map Berat)")
+        b_ultra.setIcon(svg_icon("zap", "#34D399", 15))
+        b_ultra.setObjectName("SuccessBtn")
+        b_ultra.clicked.connect(lambda: self.ctrl.apply_roblox_profile_async("ultra_fps"))
+        rbtns.addWidget(b_ultra)
+
+        b_clean = QPushButton(" Bersihkan Cache Roblox")
+        b_clean.setIcon(svg_icon("trash", "#E4E4E7", 14))
+        b_clean.setObjectName("GhostBtn")
+        b_clean.clicked.connect(self.ctrl.clean_roblox_cache_async)
+        rbtns.addWidget(b_clean)
+
+        b_rev = QPushButton("Restore Default")
+        b_rev.setObjectName("WarningBtn")
+        b_rev.clicked.connect(self.ctrl.revert_roblox_profile_async)
+        rbtns.addWidget(b_rev)
+        rbtns.addStretch()
+        rlay.addLayout(rbtns)
+        lay.addWidget(rcard)
+
+        # 2. Recommended Games & Optimal Settings for ADVAN 1701
+        from optimasi.core.game_profiles import RECOMMENDED_GAMES_660M
+
+        lay.addWidget(
+            QLabel(
+                "Rekomendasi Game Enak & Lancar di Laptopmu (Ryzen 5 6600H • Radeon 660M • 16 GB RAM)",
+                styleSheet="font-size: 15px; font-weight: 700; color: #FAFAFA; margin-top: 4px;",
+            )
+        )
+
+        grid = QGridLayout()
+        grid.setSpacing(12)
+        for idx, g in enumerate(RECOMMENDED_GAMES_660M):
+            card = QFrame()
+            card.setObjectName("FeaturedPresetCard" if g["profile_id"] in ("roblox", "mumuplayer") else "Card")
+            cl = QVBoxLayout(card)
+            cl.setContentsMargins(16, 14, 16, 14)
+            cl.setSpacing(6)
+
+            top = QHBoxLayout()
+            title_lbl = QLabel(g["name"])
+            title_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #FAFAFA;")
+            title_lbl.setWordWrap(True)
+            top.addWidget(title_lbl, 1)
+
+            fps_pill = QLabel(g["expected_fps"])
+            fps_pill.setStyleSheet(
+                "background-color: rgba(16, 185, 129, 0.16); color: #34D399; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700;"
+            )
+            top.addWidget(fps_pill)
+            cl.addLayout(top)
+
+            cl.addWidget(QLabel(g["genre"], styleSheet="color: #38BDF8; font-size: 10px; font-weight: 700;"))
+            cl.addWidget(QLabel(f"Setting Terbaik: {g['best_settings']}", styleSheet="color: #E4E4E7; font-size: 11px;", wordWrap=True))
+            cl.addWidget(QLabel(g["note"], styleSheet="color: #A1A1AA; font-size: 11px;", wordWrap=True))
+
+            if g["profile_id"] != "indie":
+                btn = QPushButton(f" Optimalkan GPU/CPU untuk {g['profile_id'].title()}")
+                btn.setIcon(svg_icon("zap", "#E4E4E7", 13))
+                btn.setObjectName("GhostBtn")
+                btn.clicked.connect(lambda _=False, pid=g["profile_id"]: self.ctrl.boost_game_profile_async(pid))
+                cl.addWidget(btn)
+            grid.addWidget(card, idx // 2, idx % 2)
+
+        lay.addLayout(grid)
+        lay.addStretch()
+        outer.addWidget(_scroll_wrap(body))
+
+    def refresh_status(self) -> None:
+        from optimasi.core.game_profiles import discover_game_profile_exes, find_roblox_version_dirs
+
+        dirs = find_roblox_version_dirs()
+        mumu = discover_game_profile_exes("mumuplayer")
+        r_txt = f"Roblox: {len(dirs)} folder" if dirs else "Roblox: Siap"
+        m_txt = f"MuMuPlayer: Terdeteksi ({len(mumu)} exe)" if mumu else "MuMuPlayer: Opsional"
+        self.roblox_status_pill.setText(f"{r_txt}  •  {m_txt}")
 
 
 class BoosterView(QWidget):

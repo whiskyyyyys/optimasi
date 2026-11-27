@@ -32,6 +32,46 @@ TWEAK_BY_ID: dict[str, Tweak] = {t.id: t for t in ALL_TWEAKS}
 
 PRESETS: list[Preset] = [
     Preset(
+        id="advan_roblox_gaming",
+        name="ADVAN 1701 Roblox & Gaming Special",
+        badge="KHUSUS DEVICE KAMU",
+        description=(
+            "Profil eksklusif untuk ADVAN 1701 (Ryzen 5 6600H + Radeon 660M + 16 GB RAM): "
+            "Roblox Smooth 120 FPS FFlags, MuMuPlayer High-Perf GPU, Nagle/TCP Gaming, AMD Ryzen/Radeon tuning, "
+            "Browser & Background RAM Diet, tetap aman untuk baterai, Wi-Fi & Sleep."
+        ),
+        tweak_ids=[
+            "cpu_laptop_ac_dc_smart",
+            "cpu_disable_power_throttling",
+            "cpu_win32_priority_gaming",
+            "cpu_amd_ryzen",
+            "gpu_hags_enable",
+            "gpu_windowed_optimizations",
+            "gpu_disable_gamedvr",
+            "gpu_mmcss_gaming",
+            "gpu_amd_radeon",
+            "gpu_roblox_smooth_fflags",
+            "gpu_auto_game_boost",
+            "net_disable_nagle",
+            "net_tcp_gaming_stack",
+            "net_qos_reserve",
+            "priv_telemetry_diag",
+            "priv_disable_ai_copilot",
+            "priv_debloat_edge",
+            "priv_ads_spotlight",
+            "priv_telemetry_tasks",
+            "ram_svchost_auto",
+            "ram_kernel_paging",
+            "ram_disable_background_uwp",
+            "ram_browser_ram_diet",
+            "storage_ntfs_perf",
+            "storage_disable_delivery_opt",
+            "sys_disable_bing_widgets",
+            "sys_raw_mouse_keyboard",
+            "svc_disable_non_essential",
+        ],
+    ),
+    Preset(
         id="laptop_pro",
         name="Laptop Ryzen/iGPU Pro",
         badge="BEST FOR YOUR LAPTOP",

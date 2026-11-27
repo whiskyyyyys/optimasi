@@ -47,9 +47,9 @@ def test_tweaks_catalog_integrity() -> None:
 
 
 def test_presets_include_laptop_profiles() -> None:
-    assert len(PRESETS) == 4
+    assert len(PRESETS) == 5
     preset_ids = {p.id for p in PRESETS}
-    assert {"laptop_pro", "laptop_battery", "gaming_pro", "safe_daily"} == preset_ids
+    assert {"advan_roblox_gaming", "laptop_pro", "laptop_battery", "gaming_pro", "safe_daily"} == preset_ids
 
     for preset in PRESETS:
         assert len(preset.tweak_ids) > 5
@@ -216,7 +216,7 @@ def test_gui_mainwindow_all_pages_render() -> None:
     assert not ico.isNull()
 
     win = MainWindow(start_dry_run=True, enable_auto_update=False)
-    assert len(MainWindow.NAV_ITEMS) == 11
+    assert len(MainWindow.NAV_ITEMS) == 12
     for page_id, *_ in MainWindow.NAV_ITEMS:
         win.switch_page(page_id)
         app.processEvents()
@@ -247,3 +247,33 @@ def test_admin_relaunch_helper_callable() -> None:
 
     assert isinstance(is_admin(), bool)
     assert callable(relaunch_as_admin)
+
+
+def test_game_profiles_and_roblox_fflags(tmp_path: Path) -> None:
+    from optimasi.core.game_profiles import (
+        RECOMMENDED_GAMES_660M,
+        apply_game_windows_boost,
+        apply_roblox_fflags,
+        revert_roblox_fflags,
+    )
+
+    assert len(RECOMMENDED_GAMES_660M) >= 8
+    assert any(g["profile_id"] == "roblox" for g in RECOMMENDED_GAMES_660M)
+
+    mock_rbx = tmp_path / "version-mock"
+    mock_rbx.mkdir()
+
+    ok, _ = apply_roblox_fflags("smooth_660m", target_dirs=[mock_rbx], dry_run=False)
+    assert ok
+    cfg = mock_rbx / "ClientSettings" / "ClientAppSettings.json"
+    assert cfg.exists()
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert data["DFIntTaskSchedulerTargetFps"] == 120
+    assert data["FFlagDebugGraphicsPreferD3D11"] is True
+
+    ok_rev, _ = revert_roblox_fflags(target_dirs=[mock_rbx], dry_run=False)
+    assert ok_rev
+    assert not cfg.exists()
+
+    ok_b, _ = apply_game_windows_boost("roblox", dry_run=True)
+    assert ok_b

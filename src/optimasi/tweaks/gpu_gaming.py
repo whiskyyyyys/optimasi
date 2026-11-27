@@ -32,6 +32,9 @@ def _discover_installed_game_exes() -> list[str]:
         r"C:\Program Files\Genshin Impact\Genshin Impact Game\GenshinImpact.exe",
         str(Path(local) / "osu!" / "osu!.exe"),
         # Android Emulators (MuMuPlayer, BlueStacks, LDPlayer, Nox)
+        r"C:\Program Files\Netease\MuMuPlayer\shell\MuMuPlayer.exe",
+        r"C:\Program Files\Netease\MuMuPlayer\nx_main\MuMuNxMain.exe",
+        r"C:\Program Files\Netease\MuMuPlayer\nx_main\MuMuNxDevice.exe",
         r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\shell\MuMuPlayer.exe",
         r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\nx_main\MuMuNxMain.exe",
         r"C:\Program Files\Netease\MuMu Player 12\shell\MuMuPlayer.exe",
@@ -362,4 +365,50 @@ def get_gpu_tweaks() -> list[Tweak]:
                 RegSet("HKLM", r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity", "Enabled", 1),
             ],
         ),
+        Tweak(
+            id="gpu_roblox_smooth_fflags",
+            name="Roblox Smooth 120 FPS Optimizer (FFlags + GPU/CPU Priority)",
+            category=CATEGORY_GPU,
+            risk=RiskLevel.SAFE,
+            source="ADVAN 1701 / Bloxstrap FFlags",
+            description="Mengatur FFlags Roblox ke D3D11, target 120 FPS, mematikan PostFx & heavy shadow, serta memberi High-Perf GPU & CPU Priority ke Roblox.",
+            default_selected=True,
+            tags=["roblox", "fflags", "fps", "120fps", "660m"],
+            apply_actions=[
+                FunctionAction(lambda **kw: [_run_roblox_fflags("smooth_660m", kw.get("dry_run", False))], "Apply Roblox Smooth 120 FPS FFlags"),
+            ],
+            revert_actions=[
+                FunctionAction(lambda **kw: [_revert_roblox_fflags(kw.get("dry_run", False))], "Restore Default Roblox FFlags"),
+            ],
+        ),
+        Tweak(
+            id="gpu_roblox_ultra_fps",
+            name="Roblox Ultra FPS / Heavy Maps Mode (240 Cap + Low Textures)",
+            category=CATEGORY_GPU,
+            risk=RiskLevel.SAFE,
+            source="Roblox Competitive FFlags",
+            description="Mode maksimal untuk map berat (Blox Fruits / Anime Defenders / Brookhaven): 240 FPS cap, D3D11, tanpa PostFx/Bloom, tekstur ringan.",
+            tags=["roblox", "fflags", "ultra", "240fps"],
+            apply_actions=[
+                FunctionAction(lambda **kw: [_run_roblox_fflags("ultra_fps", kw.get("dry_run", False))], "Apply Roblox Ultra FPS FFlags"),
+            ],
+            revert_actions=[
+                FunctionAction(lambda **kw: [_revert_roblox_fflags(kw.get("dry_run", False))], "Restore Default Roblox FFlags"),
+            ],
+        ),
     ]
+
+
+def _run_roblox_fflags(profile_key: str, dry_run: bool = False) -> str:
+    from optimasi.core.game_profiles import apply_game_windows_boost, apply_roblox_fflags
+
+    _, m1 = apply_roblox_fflags(profile_key=profile_key, dry_run=dry_run)
+    _, m2 = apply_game_windows_boost("roblox", dry_run=dry_run)
+    return f"{m1} | {m2}"
+
+
+def _revert_roblox_fflags(dry_run: bool = False) -> str:
+    from optimasi.core.game_profiles import revert_roblox_fflags
+
+    _, msg = revert_roblox_fflags(dry_run=dry_run)
+    return msg
