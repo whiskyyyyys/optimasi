@@ -34,5 +34,5 @@ if errorlevel 1 (
 echo.
 echo Build succeeded!
 echo - Standalone App: dist\OptimasiWindows\OptimasiWindows.exe
-echo - Windows Installer: dist\OptimasiWindows-Setup-2.0.1.exe
+echo - Windows Installer: dist\OptimasiWindows-Setup-2.1.0.exe
 pause

@@ -68,7 +68,7 @@ def _smoke_test_gui() -> bool:
     app.setStyle("Fusion")
     app.setStyleSheet(DARK_QSS)
     win = MainWindow(start_dry_run=True, enable_auto_update=False)
-    for page_id, _ in MainWindow.NAV_ITEMS:
+    for page_id, *_ in MainWindow.NAV_ITEMS:
         win.switch_page(page_id)
         app.processEvents()
     win.shutdown()

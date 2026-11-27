@@ -51,6 +51,8 @@ def load_settings() -> dict[str, Any]:
         "auto_check_updates": True,
         "minimize_to_tray": True,
         "last_skipped_version": "",
+        "auto_ram_clean_enabled": False,
+        "auto_ram_clean_threshold": 80,
     }
     p = get_settings_path()
     if not p.exists():

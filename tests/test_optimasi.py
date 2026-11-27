@@ -34,7 +34,7 @@ def test_python_runtime_is_311() -> None:
 
 
 def test_tweaks_catalog_integrity() -> None:
-    assert len(ALL_TWEAKS) >= 55
+    assert len(ALL_TWEAKS) >= 59
     ids = [t.id for t in ALL_TWEAKS]
     assert len(ids) == len(set(ids)), "Duplicate tweak IDs found"
 
@@ -204,16 +204,39 @@ def test_cli_self_test_out(tmp_path: Path) -> None:
 
 def test_gui_mainwindow_all_pages_render() -> None:
     from PySide6.QtWidgets import QApplication
+    from optimasi.ui.icons import svg_icon
     from optimasi.ui.main_window import MainWindow
     from optimasi.ui.style import DARK_QSS
 
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
     app.setStyleSheet(DARK_QSS)
+
+    ico = svg_icon("memory", "#38BDF8", 18)
+    assert not ico.isNull()
+
     win = MainWindow(start_dry_run=True, enable_auto_update=False)
-    for page_id, _ in MainWindow.NAV_ITEMS:
+    assert len(MainWindow.NAV_ITEMS) == 11
+    for page_id, *_ in MainWindow.NAV_ITEMS:
         win.switch_page(page_id)
         app.processEvents()
     win.shutdown()
     win.close()
     app.processEvents()
+
+
+def test_ram_optimizer_deep_clean_and_details() -> None:
+    import os
+    from optimasi.core.ram_optimizer import clean_ram_deep, get_memory_details, trim_single_process
+
+    mem = get_memory_details()
+    assert mem["total_gb"] > 0
+    assert 0 <= mem["percent"] <= 100
+    assert mem["available_gb"] > 0
+
+    dry_res = clean_ram_deep(dry_run=True)
+    assert "[DRY-RUN]" in dry_res["summary"]
+    assert dry_res["processes_trimmed"] > 0
+
+    ok_trim, msg_trim = trim_single_process(os.getpid(), dry_run=True)
+    assert ok_trim and "[DRY-RUN]" in msg_trim

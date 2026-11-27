@@ -1,10 +1,10 @@
-"""Custom PySide6 widgets: CircularScoreGauge, SparklineChart, ToggleSwitch, UpdateBanner, UpdateDialog, TweakCard."""
+"""Custom PySide6 widgets: CircularScoreGauge, MemoryBreakdownBar, SparklineChart, ToggleSwitch, ToastNotification, UpdateBanner/Dialog, TweakCard."""
 
 from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, Qt, QThread, Signal
+from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -24,18 +24,18 @@ from optimasi.tweaks.models import Tweak
 
 
 class ToggleSwitch(QAbstractButton):
-    """Animated pill toggle switch."""
+    """Sleek animated pill toggle switch."""
 
-    def __init__(self, checked: bool = False, accent: str = "#06B6D4", parent: QWidget | None = None):
+    def __init__(self, checked: bool = False, accent: str = "#0EA5E9", parent: QWidget | None = None):
         super().__init__(parent)
         self.setCheckable(True)
         self.setChecked(checked)
-        self.setFixedSize(44, 24)
+        self.setFixedSize(40, 22)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._accent = QColor(accent)
         self._pos = 1.0 if checked else 0.0
         self._anim = QPropertyAnimation(self, b"thumbPos", self)
-        self._anim.setDuration(150)
+        self._anim.setDuration(140)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self.toggled.connect(self._animate)
 
@@ -63,27 +63,31 @@ class ToggleSwitch(QAbstractButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = self.rect()
-        track_color = self._accent if self.isChecked() else QColor("#24324A")
+        track_color = self._accent if self.isChecked() else QColor("#272735")
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(track_color)
-        p.drawRoundedRect(QRectF(0, 0, r.width(), r.height()), 12, 12)
+        p.drawRoundedRect(QRectF(0, 0, r.width(), r.height()), 11, 11)
 
-        knob_d = 18
+        knob_d = 16
         x = 3 + self._pos * (r.width() - knob_d - 6)
-        p.setBrush(QColor("#F8FAFC"))
+        p.setBrush(QColor("#FAFAFA"))
         p.drawEllipse(QRectF(x, 3, knob_d, knob_d))
 
 
 class CircularScoreGauge(QWidget):
-    """Animated circular Optimization Health Score gauge (0-100)."""
+    """Animated circular donut gauge (0-100) for Health Score or RAM Usage."""
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, subtitle_prefix: str = "GRADE", color_start: str = "#38BDF8", color_end: str = "#10B981", parent: QWidget | None = None):
         super().__init__(parent)
-        self.setFixedSize(134, 134)
+        self.setFixedSize(136, 136)
         self._score = 0.0
-        self._grade = "—"
+        self._subtitle = f"{subtitle_prefix} —"
+        self._prefix = subtitle_prefix
+        self._c1 = QColor(color_start)
+        self._c2 = QColor(color_end)
+        self._suffix = ""
         self._anim = QPropertyAnimation(self, b"scoreValue", self)
-        self._anim.setDuration(600)
+        self._anim.setDuration(550)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
     def _get_score(self) -> float:
@@ -95,11 +99,12 @@ class CircularScoreGauge(QWidget):
 
     scoreValue = Property(float, _get_score, _set_score)
 
-    def set_score(self, score: int, grade: str) -> None:
-        self._grade = grade
+    def set_score(self, score: int | float, badge_text: str, suffix: str = "") -> None:
+        self._subtitle = f"{self._prefix} {badge_text}".strip() if self._prefix else badge_text
+        self._suffix = suffix
         self._anim.stop()
         self._anim.setStartValue(self._score)
-        self._anim.setEndValue(float(max(0, min(100, score))))
+        self._anim.setEndValue(float(max(0.0, min(100.0, score))))
         self._anim.start()
 
     def paintEvent(self, _event) -> None:
@@ -108,38 +113,70 @@ class CircularScoreGauge(QWidget):
         margin = 12
         rect = QRectF(margin, margin, self.width() - 2 * margin, self.height() - 2 * margin)
 
-        # Track ring
-        bg_pen = QPen(QColor("#1D2A42"), 10, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        bg_pen = QPen(QColor("#1F1F2C"), 10, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         p.setPen(bg_pen)
         p.drawArc(rect, 0, 360 * 16)
 
-        # Active arc
         grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        grad.setColorAt(0.0, QColor("#06B6D4"))
-        grad.setColorAt(1.0, QColor("#10B981"))
+        grad.setColorAt(0.0, self._c1)
+        grad.setColorAt(1.0, self._c2)
         fg_pen = QPen(grad, 10, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         p.setPen(fg_pen)
         span = -int((self._score / 100.0) * 360 * 16)
         p.drawArc(rect, 90 * 16, span)
 
-        # Score number
-        p.setPen(QColor("#F8FAFC"))
-        p.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
-        p.drawText(QRectF(0, 26, self.width(), 44), Qt.AlignmentFlag.AlignCenter, f"{int(round(self._score))}")
+        p.setPen(QColor("#FAFAFA"))
+        p.setFont(QFont("Segoe UI", 21, QFont.Weight.Bold))
+        p.drawText(QRectF(0, 28, self.width(), 44), Qt.AlignmentFlag.AlignCenter, f"{int(round(self._score))}{self._suffix}")
 
-        # Grade subtitle
-        p.setPen(QColor("#22D3EE"))
-        p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        p.drawText(QRectF(0, 72, self.width(), 24), Qt.AlignmentFlag.AlignCenter, f"GRADE {self._grade}")
+        p.setPen(self._c1)
+        p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        p.drawText(QRectF(0, 74, self.width(), 22), Qt.AlignmentFlag.AlignCenter, self._subtitle)
+
+
+class MemoryBreakdownBar(QWidget):
+    """Segmented rounded bar visualizing Active, Standby/Cached, and Free RAM."""
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setFixedHeight(20)
+        self._active_ratio = 0.4
+        self._cached_ratio = 0.25
+
+    def set_ratios(self, active_gb: float, cached_gb: float, total_gb: float) -> None:
+        tot = max(0.1, total_gb)
+        self._active_ratio = max(0.0, min(1.0, active_gb / tot))
+        self._cached_ratio = max(0.0, min(1.0 - self._active_ratio, cached_gb / tot))
+        self.update()
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w = float(self.width())
+        h = 12.0
+        y = 4.0
+
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor("#1E1E2B"))
+        p.drawRoundedRect(QRectF(0, y, w, h), 6, 6)
+
+        act_w = w * self._active_ratio
+        cac_w = w * self._cached_ratio
+        if cac_w > 1:
+            p.setBrush(QColor("#8B5CF6"))
+            p.drawRoundedRect(QRectF(0, y, act_w + cac_w, h), 6, 6)
+        if act_w > 1:
+            p.setBrush(QColor("#38BDF8"))
+            p.drawRoundedRect(QRectF(0, y, act_w, h), 6, 6)
 
 
 class SparklineChart(QWidget):
     """Real-time rolling sparkline area chart for CPU / RAM / Network."""
 
-    def __init__(self, line_color: str = "#06B6D4", max_points: int = 36, parent: QWidget | None = None):
+    def __init__(self, line_color: str = "#38BDF8", max_points: int = 36, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setMinimumHeight(52)
-        self.setMaximumHeight(64)
+        self.setMinimumHeight(50)
+        self.setMaximumHeight(60)
         self._color = QColor(line_color)
         self._max_points = max_points
         self._values: list[float] = [0.0] * 12
@@ -158,6 +195,11 @@ class SparklineChart(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w = float(self.width())
         h = float(self.height())
+
+        # Subtle baseline guide
+        p.setPen(QPen(QColor("#1F1F2B"), 1, Qt.PenStyle.DashLine))
+        p.drawLine(0, int(h * 0.5), int(w), int(h * 0.5))
+
         pad_y = 6.0
         usable_h = max(8.0, h - 2 * pad_y)
         step = w / max(1, len(self._values) - 1)
@@ -179,15 +221,54 @@ class SparklineChart(QWidget):
 
         fill_grad = QLinearGradient(0, 0, 0, h)
         c_top = QColor(self._color)
-        c_top.setAlpha(90)
+        c_top.setAlpha(85)
         c_bot = QColor(self._color)
-        c_bot.setAlpha(5)
+        c_bot.setAlpha(4)
         fill_grad.setColorAt(0.0, c_top)
         fill_grad.setColorAt(1.0, c_bot)
         p.fillPath(fill_path, fill_grad)
 
         p.setPen(QPen(self._color, 2.0))
         p.drawPath(line_path)
+
+
+class ToastNotification(QFrame):
+    """Floating bottom-right toast pill inside MainWindow."""
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setObjectName("ToastFrame")
+        self.setVisible(False)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(14, 10, 14, 10)
+        lay.setSpacing(8)
+        self.dot = QLabel("●")
+        self.dot.setStyleSheet("color: #38BDF8; font-size: 12px;")
+        lay.addWidget(self.dot)
+        self.lbl = QLabel("")
+        self.lbl.setStyleSheet("color: #FAFAFA; font-size: 12px; font-weight: 600;")
+        lay.addWidget(self.lbl)
+
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.hide)
+
+    def show_toast(self, message: str, kind: str = "info", duration_ms: int = 3600) -> None:
+        colors = {"success": "#34D399", "warning": "#FBBF24", "error": "#F87171", "info": "#38BDF8"}
+        c = colors.get(kind, "#38BDF8")
+        self.dot.setStyleSheet(f"color: {c}; font-size: 12px;")
+        self.setStyleSheet(f"QFrame#ToastFrame {{ background-color: #181824; border: 1px solid {c}; border-radius: 10px; }}")
+        self.lbl.setText(message)
+        self.adjustSize()
+        self.reposition()
+        self.raise_()
+        self.setVisible(True)
+        self._timer.start(duration_ms)
+
+    def reposition(self) -> None:
+        p = self.parentWidget()
+        if p:
+            self.move(max(16, p.width() - self.width() - 24), max(16, p.height() - self.height() - 50))
 
 
 class UpdateBanner(QFrame):
@@ -280,15 +361,15 @@ class UpdateDialog(QDialog):
         lay.setSpacing(12)
 
         title = QLabel(f"Versi Baru Tersedia: v{update.latest_version}")
-        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #22D3EE;")
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #38BDF8;")
         lay.addWidget(title)
 
-        sub = QLabel(f"Versi saat ini: v{update.current_version}  ->  Paket: {update.asset_name}")
-        sub.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        sub = QLabel(f"Versi saat ini: v{update.current_version}  •  Paket: {update.asset_name}")
+        sub.setStyleSheet("color: #A1A1AA; font-size: 12px;")
         lay.addWidget(sub)
 
         notes = QTextBrowser()
-        notes.setStyleSheet("background-color: #0E1524; border: 1px solid #1E2B42; border-radius: 8px; padding: 8px; color: #E2E8F0;")
+        notes.setStyleSheet("background-color: #111118; border: 1px solid #22222C; border-radius: 10px; padding: 10px; color: #E4E4E7;")
         notes.setMarkdown(update.changelog)
         lay.addWidget(notes, 1)
 
@@ -298,7 +379,7 @@ class UpdateDialog(QDialog):
         lay.addWidget(self.progress_bar)
 
         self.status_lbl = QLabel("")
-        self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11px;")
+        self.status_lbl.setStyleSheet("color: #A1A1AA; font-size: 11px;")
         lay.addWidget(self.status_lbl)
 
         btns = QHBoxLayout()
@@ -363,7 +444,7 @@ class UpdateDialog(QDialog):
 
 
 class TweakCardWidget(QFrame):
-    """Modern Fluent card representing an individual Windows tweak."""
+    """Sleek Obsidian card representing an individual Windows tweak."""
 
     def __init__(
         self,
@@ -379,29 +460,29 @@ class TweakCardWidget(QFrame):
         self.tweak = tweak
 
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(14, 12, 14, 12)
-        lay.setSpacing(12)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(14)
 
         self.switch = ToggleSwitch(checked=checked)
         self.switch.toggled.connect(lambda state: on_toggle(tweak.id, state))
         lay.addWidget(self.switch, 0, Qt.AlignmentFlag.AlignTop)
 
         center = QVBoxLayout()
-        center.setSpacing(4)
+        center.setSpacing(5)
         top_row = QHBoxLayout()
         top_row.setSpacing(8)
 
         name_lbl = QLabel(tweak.name)
-        name_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        name_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #FAFAFA;")
         name_lbl.setWordWrap(True)
         top_row.addWidget(name_lbl, 1)
 
         risk_styles = {
-            "SAFE": ("#064E3B", "#34D399"),
-            "MODERATE": ("#451A03", "#FBBF24"),
-            "ADVANCED": ("#450A0A", "#F87171"),
+            "SAFE": ("rgba(16, 185, 129, 0.14)", "#34D399"),
+            "MODERATE": ("rgba(245, 158, 11, 0.14)", "#FBBF24"),
+            "ADVANCED": ("rgba(239, 68, 68, 0.14)", "#F87171"),
         }
-        rbg, rfg = risk_styles.get(tweak.risk.value, ("#1E293B", "#94A3B8"))
+        rbg, rfg = risk_styles.get(tweak.risk.value, ("#1F1F29", "#A1A1AA"))
         risk_pill = QLabel(tweak.risk.value)
         risk_pill.setStyleSheet(
             f"background-color: {rbg}; color: {rfg}; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700;"
@@ -410,13 +491,13 @@ class TweakCardWidget(QFrame):
 
         src_pill = QLabel(tweak.source)
         src_pill.setStyleSheet(
-            "background-color: #1A2438; color: #94A3B8; border-radius: 6px; padding: 2px 8px; font-size: 10px;"
+            "background-color: #1D1D28; color: #A1A1AA; border-radius: 6px; padding: 2px 8px; font-size: 10px;"
         )
         top_row.addWidget(src_pill)
         center.addLayout(top_row)
 
         desc_lbl = QLabel(tweak.description)
-        desc_lbl.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        desc_lbl.setStyleSheet("color: #A1A1AA; font-size: 12px;")
         desc_lbl.setWordWrap(True)
         center.addWidget(desc_lbl)
         lay.addLayout(center, 1)
@@ -425,14 +506,14 @@ class TweakCardWidget(QFrame):
         right.setSpacing(6)
         btn_apply = QPushButton("Apply")
         btn_apply.setObjectName("PrimaryBtn")
-        btn_apply.setFixedWidth(74)
+        btn_apply.setFixedWidth(76)
         btn_apply.clicked.connect(lambda: on_apply(tweak))
         right.addWidget(btn_apply)
 
         if tweak.reversible:
             btn_rev = QPushButton("Revert")
             btn_rev.setObjectName("GhostBtn")
-            btn_rev.setFixedWidth(74)
+            btn_rev.setFixedWidth(76)
             btn_rev.clicked.connect(lambda: on_revert(tweak))
             right.addWidget(btn_rev)
 

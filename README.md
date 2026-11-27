@@ -1,12 +1,21 @@
-# Optimasi Windows v2.0.0 (Python 3.11 + Nuitka + Windows Installer)
+# Optimasi Windows v2.1.0 (Python 3.11 + Nuitka + Windows Installer)
 
-Aplikasi desktop **Windows 10/11** bergaya **Windows 11 Dark Fluent (PySide6)** untuk optimasi performa laptop & PC, gaming FPS, emulator (MuMuPlayer/BlueStacks/LDPlayer), latensi jaringan, privasi/AI debloat, pembersihan cache/RAM, serta perbaikan sistem.
+Aplikasi desktop **Windows 10/11** bergaya **Obsidian Dark Fluent (PySide6)** dengan ikon vektor SVG untuk optimasi performa laptop & PC, **Deep RAM Optimizer & Auto-RAM Guard**, gaming FPS, emulator (MuMuPlayer/BlueStacks/LDPlayer), latensi jaringan, privasi/AI debloat, pembersihan cache, serta perbaikan sistem.
 
-Dilengkapi **Windows Installer resmi (`OptimasiWindows-Setup-2.0.0.exe`)** dan **In-App Auto-Updater** yang mengecek & mengunduh update langsung dari GitHub Releases secara otomatis di dalam aplikasi tanpa perlu download manual.
+Dilengkapi **Windows Installer resmi (`OptimasiWindows-Setup-2.1.0.exe`)** dan **In-App Auto-Updater** yang mengecek & mengunduh update langsung dari GitHub Releases secara otomatis di dalam aplikasi tanpa perlu download manual.
 
 ---
 
-## Yang Baru di v2.0.0
+## Yang Baru di v2.1.0
+
+- **Redesain UI Obsidian Dark Fluent + Ikon Vektor SVG**:
+  - Palet Obsidian/Zinc yang jauh lebih bersih & elegan, ikon vektor SVG tajam di seluruh navigasi & tombol, console log tersembunyi secara default dengan status bar ramping + **Floating Toast Notifications** di pojok kanan bawah.
+- **Deep RAM Optimizer & Auto-RAM Guard (ISLC / MemReduct Style)**:
+  - **Breakdown Memori Real-Time** (Active, Standby/Cache, Free, Commit) + Donut Gauge & Segmented Bar.
+  - **Bersihkan RAM (Deep Clean)**: Gabungan Working-Set Trim + System File Cache Flush + Standby Memory List Purge (`NtSetSystemInformation`).
+  - **Auto-Clean RAM Guard**: Pembersihan otomatis di latar belakang ketika pemakaian RAM melewati threshold (`70%` / `75%` / `80%` / `85%`).
+  - **Per-App RAM Trimmer**: Tekan `Trim` pada aplikasi pemakan RAM untuk melegakan memori **tanpa menutup aplikasi**.
+  - Tambahan tweak RAM baru: **Matikan Aplikasi Background Windows** & **Browser RAM Diet (Chrome & Edge Sleeping Tabs)**.
 
 - **Tampilan Modern Commercial-Grade (PySide6 Dark Fluent)**:
   - Native Windows 11 Dark Titlebar (`DwmSetWindowAttribute`), animated **Circular Optimization Score Gauge (0–100, Grade S–D)**, grafik **Live Sparkline** real-time (CPU, RAM, Network KB/s), animated pill **ToggleSwitch**, dan **System Tray** dengan notifikasi Windows.

@@ -1,4 +1,4 @@
-"""Main PySide6 window, background worker runner, auto-updater integration, and System Tray."""
+"""Main PySide6 window with Obsidian Fluent design, SVG icons, Deep RAM Guard, and System Tray."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,9 +31,10 @@ from optimasi import APP_NAME, APP_VERSION
 from optimasi.core.admin import is_admin, relaunch_as_admin
 from optimasi.core.backup import create_restore_point, export_registry_backup, revert_session
 from optimasi.core.booster import GameBooster, set_laptop_thermal_mode
-from optimasi.core.cleaner import clean_junk, run_system_repair, scan_junk, trim_ram_working_sets
+from optimasi.core.cleaner import clean_junk, run_system_repair, scan_junk
 from optimasi.core.executor import TweakExecutor
 from optimasi.core.health_score import evaluate_optimization_score
+from optimasi.core.ram_optimizer import clean_ram_deep, purge_standby_list, trim_single_process
 from optimasi.core.system_info import get_net_io_counters, get_system_snapshot, terminate_process
 from optimasi.core.updater import UpdateInfo, check_for_updates, load_settings, save_settings
 from optimasi.tweaks import (
@@ -47,7 +48,8 @@ from optimasi.tweaks.models import AppxRemove, DnsSet, RiskLevel, Tweak
 from optimasi.tweaks.network_dns import ping_endpoints
 from optimasi.tweaks.privacy_debloat import SAFE_BLOAT_APPX, get_installed_bloat_appx
 from optimasi.tweaks.startup import set_startup_item_enabled
-from optimasi.ui.custom_widgets import ToggleSwitch, UpdateBanner, UpdateDialog
+from optimasi.ui.custom_widgets import ToastNotification, ToggleSwitch, UpdateBanner, UpdateDialog
+from optimasi.ui.icons import svg_icon
 from optimasi.ui.style import DARK_QSS, apply_windows_dark_titlebar
 from optimasi.ui.views import (
     BackupUpdatesView,
@@ -55,6 +57,7 @@ from optimasi.ui.views import (
     CategoryView,
     CleanerView,
     DashboardView,
+    RamOptimizerView,
 )
 
 
@@ -91,7 +94,7 @@ class _TaskWorker(QThread):
 
 
 class _UpdateCheckWorker(QThread):
-    completed = Signal(object, object)  # (UpdateInfo | None, err | None)
+    completed = Signal(object, object)
 
     def run(self) -> None:
         info, err = check_for_updates()
@@ -99,25 +102,26 @@ class _UpdateCheckWorker(QThread):
 
 
 class MainWindow(QMainWindow):
-    """Commercial-grade Fluent PySide6 window for Optimasi Windows."""
+    """Modern Obsidian Fluent PySide6 window for Optimasi Windows."""
 
     NAV_ITEMS = [
-        ("dashboard", "🏠  Dashboard"),
-        ("booster", "⚡  Game & Laptop Booster"),
-        ("CPU & Power", "🧠  CPU & Power"),
-        ("GPU & Gaming", "🎮  GPU & Gaming"),
-        ("Network & DNS", "🌐  Network & DNS"),
-        ("Privacy & Debloat", "🛡  Privacy & Debloat"),
-        ("RAM & Storage", "💾  RAM & Storage"),
-        ("Services & System", "⚙  Services & System"),
-        ("cleaner", "🧹  Cleaner & Repair"),
-        ("backup", "🔄  Backup & Updates"),
+        ("dashboard", "home", "Dashboard"),
+        ("ram", "memory", "RAM Optimizer"),
+        ("booster", "zap", "Game & Laptop Booster"),
+        ("CPU & Power", "cpu", "CPU & Power"),
+        ("GPU & Gaming", "gamepad", "GPU & Gaming"),
+        ("Network & DNS", "globe", "Network & DNS"),
+        ("Privacy & Debloat", "shield", "Privacy & Debloat"),
+        ("RAM & Storage", "harddrive", "RAM & Storage"),
+        ("Services & System", "sliders", "Services & System"),
+        ("cleaner", "sparkles", "Cleaner & Repair"),
+        ("backup", "refresh", "Backup & Updates"),
     ]
 
     def __init__(self, start_dry_run: bool = False, enable_auto_update: bool = True):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
-        self.resize(1260, 810)
+        self.resize(1280, 820)
         self.setMinimumSize(1060, 680)
 
         icon_path = resolve_asset_path("assets/app.ico")
@@ -131,6 +135,7 @@ class MainWindow(QMainWindow):
         self.latest_update: UpdateInfo | None = None
         self.active_workers: list[QThread] = []
         self._force_quit = False
+        self._last_auto_ram_clean = 0.0
 
         self.tweak_checked: dict[str, bool] = {t.id: t.default_selected for t in ALL_TWEAKS}
         self.appx_checked: dict[str, bool] = {pkg: True for pkg, _ in SAFE_BLOAT_APPX}
@@ -138,14 +143,21 @@ class MainWindow(QMainWindow):
         self._last_net_time = time.monotonic()
 
         self._build_ui()
+        self.toast = ToastNotification(self)
         self._setup_tray()
         apply_windows_dark_titlebar(int(self.winId()))
 
         self._refresh_hardware_and_score()
         self._start_telemetry_timer()
+        self._start_auto_ram_timer()
 
         if enable_auto_update and self.settings.get("auto_check_updates", True):
             QTimer.singleShot(1200, lambda: self.check_updates_async(manual=False))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "toast") and self.toast.isVisible():
+            self.toast.reposition()
 
     # ------------------------------------------------------------------
     # UI Construction
@@ -160,10 +172,10 @@ class MainWindow(QMainWindow):
         # Sidebar
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(236)
+        sidebar.setFixedWidth(238)
         sb_lay = QVBoxLayout(sidebar)
-        sb_lay.setContentsMargins(12, 18, 12, 14)
-        sb_lay.setSpacing(4)
+        sb_lay.setContentsMargins(12, 20, 12, 14)
+        sb_lay.setSpacing(3)
 
         brand = QLabel("OPTIMASI")
         brand.setObjectName("BrandTitle")
@@ -174,28 +186,29 @@ class MainWindow(QMainWindow):
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("background-color: #1C263B; max-height: 1px; margin: 8px 0px;")
+        sep.setStyleSheet("background-color: #1C1C24; max-height: 1px; margin: 10px 0px;")
         sb_lay.addWidget(sep)
 
-        self.nav_buttons: dict[str, QPushButton] = {}
-        for page_id, label in self.NAV_ITEMS:
-            btn = QPushButton(label)
+        self.nav_buttons: dict[str, tuple[QPushButton, str]] = {}
+        for page_id, icon_name, label in self.NAV_ITEMS:
+            btn = QPushButton(f"  {label}")
             btn.setObjectName("NavBtn")
+            btn.setIcon(svg_icon(icon_name, "#A1A1AA", 17))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda _=False, pid=page_id: self.switch_page(pid))
             sb_lay.addWidget(btn)
-            self.nav_buttons[page_id] = btn
+            self.nav_buttons[page_id] = (btn, icon_name)
 
         sb_lay.addStretch()
 
         self.sidebar_footer = QLabel(
-            f"Python {platform.python_version()} • Nuitka Ready\n{len(ALL_TWEAKS)} Optimizations Loaded"
+            f"Python {platform.python_version()} • Nuitka\n{len(ALL_TWEAKS)} Optimizations Ready"
         )
-        self.sidebar_footer.setStyleSheet("color: #64748B; font-size: 11px; padding: 6px;")
+        self.sidebar_footer.setStyleSheet("color: #71717A; font-size: 11px; padding: 8px 6px;")
         sb_lay.addWidget(self.sidebar_footer)
         main_lay.addWidget(sidebar)
 
-        # Right Column (Header + UpdateBanner + Stack + Console)
+        # Right Column
         right_col = QVBoxLayout()
         right_col.setContentsMargins(0, 0, 0, 0)
         right_col.setSpacing(0)
@@ -203,9 +216,9 @@ class MainWindow(QMainWindow):
         # Header Bar
         header = QFrame()
         header.setObjectName("HeaderBar")
-        header.setFixedHeight(60)
+        header.setFixedHeight(62)
         h_lay = QHBoxLayout(header)
-        h_lay.setContentsMargins(20, 10, 20, 10)
+        h_lay.setContentsMargins(24, 10, 24, 10)
         h_lay.setSpacing(12)
 
         self.page_title = QLabel("Dashboard")
@@ -215,13 +228,13 @@ class MainWindow(QMainWindow):
 
         self.search_box = QLineEdit()
         self.search_box.setObjectName("SearchBox")
-        self.search_box.setPlaceholderText("Cari tweak (Nagle, HAGS, Copilot, Ryzen, SSD)...")
+        self.search_box.setPlaceholderText("Cari tweak (Nagle, RAM, HAGS, Copilot, Ryzen)...")
         self.search_box.setFixedWidth(300)
         self.search_box.textChanged.connect(self._on_search)
         h_lay.addWidget(self.search_box)
 
         dry_lbl = QLabel("Dry-Run")
-        dry_lbl.setStyleSheet("color: #94A3B8; font-weight: 600; font-size: 12px;")
+        dry_lbl.setStyleSheet("color: #A1A1AA; font-weight: 600; font-size: 12px;")
         h_lay.addWidget(dry_lbl)
         self.dry_switch = ToggleSwitch(checked=self.dry_run, accent="#F59E0B")
         self.dry_switch.toggled.connect(self._on_dry_run_toggled)
@@ -230,36 +243,30 @@ class MainWindow(QMainWindow):
         admin_ok = is_admin()
         self.admin_btn = QPushButton("ADMIN AKTIF" if admin_ok else "ELEVATE (ADMIN)")
         self.admin_btn.setObjectName("SuccessBtn" if admin_ok else "WarningBtn")
-        self.admin_btn.clicked.connect(self._on_elevate if not admin_ok else lambda: self.log("Sudah berjalan dengan hak Administrator."))
+        self.admin_btn.clicked.connect(self._on_elevate if not admin_ok else lambda: self.show_toast("Sudah berjalan dengan hak Administrator.", "success"))
         h_lay.addWidget(self.admin_btn)
         right_col.addWidget(header)
 
-        # In-App Update Notification Banner
+        # Update Banner
         banner_wrap = QVBoxLayout()
-        banner_wrap.setContentsMargins(20, 8, 20, 0)
+        banner_wrap.setContentsMargins(24, 8, 24, 0)
         self.update_banner = UpdateBanner()
         self.update_banner.details_clicked.connect(self._open_update_dialog)
         self.update_banner.update_clicked.connect(self._open_update_dialog_and_download)
         banner_wrap.addWidget(self.update_banner)
         right_col.addLayout(banner_wrap)
 
-        # Console Drawer (built before views so status_lbl & console always exist)
-        console_wrap = QFrame()
-        console_wrap.setStyleSheet("background-color: #0E1422; border-top: 1px solid #1C263B;")
-        c_lay = QVBoxLayout(console_wrap)
-        c_lay.setContentsMargins(16, 6, 16, 10)
-        c_lay.setSpacing(4)
+        # Collapsible Console Drawer (created BEFORE views, hidden by default for clean look!)
+        self.console_wrap = QFrame()
+        self.console_wrap.setStyleSheet("background-color: #0D0D12; border-top: 1px solid #1C1C24;")
+        self.console_wrap.setVisible(False)
+        c_lay = QVBoxLayout(self.console_wrap)
+        c_lay.setContentsMargins(20, 8, 20, 8)
+        c_lay.setSpacing(6)
 
         cbar = QHBoxLayout()
-        cbar.addWidget(QLabel("EXECUTION LOG", styleSheet="font-size: 10px; font-weight: 700; color: #94A3B8;"))
-        self.status_lbl = QLabel("Ready")
-        self.status_lbl.setStyleSheet("font-size: 11px; color: #22D3EE; margin-left: 10px;")
-        cbar.addWidget(self.status_lbl)
+        cbar.addWidget(QLabel("EXECUTION LOG", styleSheet="font-size: 10px; font-weight: 700; color: #71717A;"))
         cbar.addStretch()
-        btn_toggle_con = QPushButton("Hide/Show")
-        btn_toggle_con.setObjectName("GhostBtn")
-        btn_toggle_con.clicked.connect(lambda: self.console.setVisible(not self.console.isVisible()))
-        cbar.addWidget(btn_toggle_con)
         btn_clear_con = QPushButton("Clear")
         btn_clear_con.setObjectName("GhostBtn")
         btn_clear_con.clicked.connect(lambda: self.console.clear())
@@ -269,24 +276,59 @@ class MainWindow(QMainWindow):
         self.console = QPlainTextEdit()
         self.console.setObjectName("ConsoleBox")
         self.console.setReadOnly(True)
-        self.console.setFixedHeight(105)
+        self.console.setFixedHeight(115)
         c_lay.addWidget(self.console)
+
+        # Sleek Compact Status Bar
+        status_bar = QFrame()
+        status_bar.setObjectName("StatusBarFrame")
+        status_bar.setFixedHeight(36)
+        s_lay = QHBoxLayout(status_bar)
+        s_lay.setContentsMargins(20, 4, 20, 4)
+        s_lay.setSpacing(12)
+
+        self.status_lbl = QLabel("Ready")
+        self.status_lbl.setStyleSheet("font-size: 11px; color: #38BDF8; font-weight: 600;")
+        s_lay.addWidget(self.status_lbl)
+        s_lay.addStretch()
+
+        self.status_ram_lbl = QLabel("RAM: —%")
+        self.status_ram_lbl.setStyleSheet("font-size: 11px; color: #A1A1AA; font-weight: 600;")
+        s_lay.addWidget(self.status_ram_lbl)
+
+        mini_ram_btn = QPushButton(" Trim RAM")
+        mini_ram_btn.setIcon(svg_icon("memory", "#E4E4E7", 13))
+        mini_ram_btn.setObjectName("GhostBtn")
+        mini_ram_btn.setStyleSheet("padding: 3px 10px; font-size: 11px;")
+        mini_ram_btn.clicked.connect(self.deep_clean_ram_async)
+        s_lay.addWidget(mini_ram_btn)
+
+        self.btn_log_toggle = QPushButton(" Console Log")
+        self.btn_log_toggle.setIcon(svg_icon("terminal", "#E4E4E7", 13))
+        self.btn_log_toggle.setObjectName("GhostBtn")
+        self.btn_log_toggle.setStyleSheet("padding: 3px 10px; font-size: 11px;")
+        self.btn_log_toggle.clicked.connect(lambda: self.console_wrap.setVisible(not self.console_wrap.isVisible()))
+        s_lay.addWidget(self.btn_log_toggle)
 
         # Page Router
         self.stack = QStackedWidget()
         self.dashboard_view = DashboardView(self)
+        self.ram_view = RamOptimizerView(self)
         self.booster_view = BoosterView(self)
         self.category_view = CategoryView(self)
         self.cleaner_view = CleanerView(self)
         self.backup_view = BackupUpdatesView(self)
 
         self.stack.addWidget(self.dashboard_view)
+        self.stack.addWidget(self.ram_view)
         self.stack.addWidget(self.booster_view)
         self.stack.addWidget(self.category_view)
         self.stack.addWidget(self.cleaner_view)
         self.stack.addWidget(self.backup_view)
+
         right_col.addWidget(self.stack, 1)
-        right_col.addWidget(console_wrap)
+        right_col.addWidget(self.console_wrap)
+        right_col.addWidget(status_bar)
 
         main_lay.addLayout(right_col, 1)
         self.switch_page("dashboard")
@@ -304,15 +346,15 @@ class MainWindow(QMainWindow):
         act_open.triggered.connect(self._restore_from_tray)
         menu.addAction(act_open)
 
-        act_trim = QAction("⚡ Quick RAM Trim", self)
-        act_trim.triggered.connect(self.trim_ram_now)
+        act_trim = QAction("Bersihkan RAM (Deep Clean)", self)
+        act_trim.triggered.connect(self.deep_clean_ram_async)
         menu.addAction(act_trim)
 
-        act_boost = QAction("🎮 Toggle Game Boost", self)
+        act_boost = QAction("Toggle Game Boost", self)
         act_boost.triggered.connect(self.toggle_game_boost)
         menu.addAction(act_boost)
 
-        act_upd = QAction("🔄 Cek Update GitHub", self)
+        act_upd = QAction("Cek Update GitHub", self)
         act_upd.triggered.connect(lambda: self.check_updates_async(manual=True))
         menu.addAction(act_upd)
 
@@ -339,6 +381,8 @@ class MainWindow(QMainWindow):
         self._force_quit = True
         if hasattr(self, "telemetry_timer"):
             self.telemetry_timer.stop()
+        if hasattr(self, "auto_ram_timer"):
+            self.auto_ram_timer.stop()
         app = QApplication.instance()
         for w in list(self.active_workers):
             while w.isRunning():
@@ -364,7 +408,7 @@ class MainWindow(QMainWindow):
             self.hide()
             self.tray.showMessage(
                 APP_NAME,
-                "Aplikasi berjalan di System Tray. Klik kanan ikon untuk Quick RAM Trim atau Exit.",
+                "Aplikasi berjalan di System Tray. Klik kanan ikon untuk Bersihkan RAM atau Exit.",
                 QSystemTrayIcon.MessageIcon.Information,
                 2500,
             )
@@ -373,12 +417,16 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     # ------------------------------------------------------------------
-    # Logging, Settings, & Background Runner
+    # Logging, Toasts, Settings, & Background Runner
     # ------------------------------------------------------------------
     def log(self, msg: str) -> None:
         stamp = datetime.now().strftime("%H:%M:%S")
         if hasattr(self, "console"):
             self.console.appendPlainText(f"[{stamp}] {msg}")
+
+    def show_toast(self, message: str, kind: str = "info") -> None:
+        if hasattr(self, "toast"):
+            self.toast.show_toast(message, kind=kind)
 
     def update_setting(self, key: str, value: Any) -> None:
         self.settings[key] = value
@@ -386,7 +434,9 @@ class MainWindow(QMainWindow):
 
     def _on_dry_run_toggled(self, val: bool) -> None:
         self.dry_run = val
-        self.log(f"Dry-Run Mode {'AKTIF (simulasi aman)' if val else 'NONAKTIF (eksekusi live)'}.")
+        msg = f"Dry-Run Mode {'AKTIF (simulasi aman)' if val else 'NONAKTIF (eksekusi live)'}."
+        self.log(msg)
+        self.show_toast(msg, "warning" if val else "info")
 
     def _on_elevate(self) -> None:
         self.log("Meminta hak Administrator (UAC)...")
@@ -418,6 +468,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, "status_lbl"):
                 self.status_lbl.setText("Ready")
             self.log(f"ERROR ({label}): {err}")
+            self.show_toast(f"Error: {err[:60]}", "error")
             if worker in self.active_workers:
                 self.active_workers.remove(worker)
 
@@ -430,17 +481,21 @@ class MainWindow(QMainWindow):
     # Navigation & Search
     # ------------------------------------------------------------------
     def switch_page(self, page_id: str) -> None:
-        for pid, btn in self.nav_buttons.items():
-            btn.setProperty("active", "true" if pid == page_id else "false")
+        for pid, (btn, icon_name) in self.nav_buttons.items():
+            active = pid == page_id
+            btn.setProperty("active", "true" if active else "false")
+            btn.setIcon(svg_icon(icon_name, "#38BDF8" if active else "#A1A1AA", 17))
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
-        titles = dict(self.NAV_ITEMS)
-        raw_title = titles.get(page_id, page_id)
-        self.page_title.setText(raw_title.split("  ", 1)[-1])
+        titles = {pid: lbl for pid, _, lbl in self.NAV_ITEMS}
+        self.page_title.setText(titles.get(page_id, page_id))
 
         if page_id == "dashboard":
             self.stack.setCurrentWidget(self.dashboard_view)
+        elif page_id == "ram":
+            self.ram_view.refresh_ram_view()
+            self.stack.setCurrentWidget(self.ram_view)
         elif page_id == "booster":
             self.booster_view.refresh_processes()
             self.stack.setCurrentWidget(self.booster_view)
@@ -466,7 +521,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.category_view)
 
     # ------------------------------------------------------------------
-    # Live Telemetry & Health Score
+    # Live Telemetry, Health Score, & Auto-RAM Guard
     # ------------------------------------------------------------------
     def _refresh_hardware_and_score(self) -> None:
         def _work(_log):
@@ -491,11 +546,10 @@ class MainWindow(QMainWindow):
                 f"GPU: {gpu_str}  •  RAM: {ram['total_gb']} GB  •  SSD C: {disk['free_gb']} GB Free / {disk['total_gb']} GB"
             )
             if bat["has_battery"]:
-                icon = "🔌" if bat["plugged"] else "🔋"
                 state = "Plugged In" if bat["plugged"] else "On Battery"
-                self.dashboard_view.battery_pill.setText(f"{icon} Battery {bat['percent']}% ({state})")
+                self.dashboard_view.battery_pill.setText(f"Battery {bat['percent']}% ({state})")
             else:
-                self.dashboard_view.battery_pill.setText("🖥 AC Desktop Power")
+                self.dashboard_view.battery_pill.setText("AC Desktop Power")
             self.dashboard_view.plan_pill.setText(f"Plan: {snap['power_plan']}")
 
             self.dashboard_view.disk_val_lbl.setText(f"{disk['free_gb']} GB Free")
@@ -544,6 +598,29 @@ class MainWindow(QMainWindow):
         dv.net_sub_lbl.setText(f"↑ {up_kbps:.0f} KB/s upload")
         dv.net_chart.push_value(down_kbps + up_kbps, 2048.0)
 
+        if hasattr(self, "status_ram_lbl"):
+            self.status_ram_lbl.setText(f"RAM: {vm.percent:.0f}% ({used_gb}/{tot_gb} GB)")
+
+    def _start_auto_ram_timer(self) -> None:
+        self.auto_ram_timer = QTimer(self)
+        self.auto_ram_timer.timeout.connect(self._check_auto_ram_clean)
+        self.auto_ram_timer.start(30000)
+
+    def _check_auto_ram_clean(self) -> None:
+        if not self.settings.get("auto_ram_clean_enabled", False):
+            return
+        import psutil
+
+        now = time.monotonic()
+        if (now - self._last_auto_ram_clean) < 180:
+            return
+        thresh = int(self.settings.get("auto_ram_clean_threshold", 80))
+        pct = psutil.virtual_memory().percent
+        if pct >= thresh:
+            self._last_auto_ram_clean = now
+            self.log(f"Auto-RAM Guard terpicu ({pct:.0f}% >= {thresh}%). Membersihkan RAM...")
+            self.deep_clean_ram_async()
+
     # ------------------------------------------------------------------
     # Auto-Updater Integration
     # ------------------------------------------------------------------
@@ -560,11 +637,14 @@ class MainWindow(QMainWindow):
             if err:
                 self.log(f"Update check note: {err}")
                 self.backup_view.update_status_lbl.setText(err)
+                if manual:
+                    self.show_toast(err, "warning")
                 return
             if info is None:
                 msg = f"Aplikasi sudah versi terbaru (v{APP_VERSION})."
                 if manual:
                     self.log(msg)
+                    self.show_toast(msg, "success")
                 self.backup_view.update_status_lbl.setText(msg)
                 return
 
@@ -613,40 +693,93 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     # ------------------------------------------------------------------
-    # Actions: Tweaks, Presets, Booster, Cleaner, Backup
+    # Actions: RAM Optimizer, Tweaks, Presets, Booster, Cleaner, Backup
     # ------------------------------------------------------------------
+    def deep_clean_ram_async(self) -> None:
+        dry = self.dry_run
+
+        def _work(log_fn):
+            return clean_ram_deep(purge_standby=True, trim_working_sets=True, flush_file_cache=True, dry_run=dry, log_cb=log_fn)
+
+        def _done(res: dict) -> None:
+            self.ram_view.last_freed_lbl.setText(res["summary"])
+            self.ram_view.refresh_ram_view()
+            self.show_toast(res["summary"], "success")
+
+        self._run_bg("Deep RAM Clean", _work, on_done=_done)
+
+    def purge_standby_only_async(self) -> None:
+        dry = self.dry_run
+
+        def _work(log_fn):
+            ok, msg = purge_standby_list(low_priority_only=False, dry_run=dry)
+            log_fn(msg)
+            return ok, msg
+
+        def _done(res) -> None:
+            ok, msg = res
+            self.ram_view.last_freed_lbl.setText(msg)
+            self.ram_view.refresh_ram_view()
+            self.show_toast(msg, "success" if ok else "warning")
+
+        self._run_bg("Purge Standby Cache", _work, on_done=_done)
+
+    def trim_process_ram(self, pid: int, on_done: Callable[[], None] | None = None) -> None:
+        ok, msg = trim_single_process(pid, dry_run=self.dry_run)
+        self.log(msg)
+        self.show_toast(msg, "success" if ok else "warning")
+        if ok and on_done:
+            on_done()
+
     def run_preset(self, preset_id: str, preset_name: str) -> None:
         tweaks = get_preset_tweaks(preset_id)
         dry = self.dry_run
 
         def _work(log_fn):
             res = TweakExecutor(dry_run=dry, log_cb=log_fn).run_tweaks(tweaks, revert=False, session_label=preset_name)
-            log_fn(f"Preset '{preset_name}' selesai: {res.succeeded} OK, {res.failed} gagal, {res.skipped} skip.")
+            msg = f"Preset '{preset_name}' selesai: {res.succeeded} OK, {res.failed} gagal."
+            log_fn(msg)
+            return msg
 
-        self._run_bg(preset_name, _work, on_done=lambda _: self._refresh_hardware_and_score())
+        def _done(msg: str) -> None:
+            self._refresh_hardware_and_score()
+            self.show_toast(msg, "success")
+
+        self._run_bg(preset_name, _work, on_done=_done)
 
     def run_single_tweak(self, tweak: Tweak, revert: bool = False) -> None:
         dry = self.dry_run
         mode = "Revert" if revert else "Apply"
-        self._run_bg(
-            f"{mode} {tweak.name}",
-            lambda log_fn: TweakExecutor(dry_run=dry, log_cb=log_fn).run_tweaks([tweak], revert=revert, session_label=tweak.name),
-            on_done=lambda _: self._refresh_hardware_and_score(),
-        )
+
+        def _work(log_fn):
+            TweakExecutor(dry_run=dry, log_cb=log_fn).run_tweaks([tweak], revert=revert, session_label=tweak.name)
+            return f"{mode} selesai: {tweak.name}"
+
+        def _done(msg: str) -> None:
+            self._refresh_hardware_and_score()
+            self.show_toast(msg, "success")
+
+        self._run_bg(f"{mode} {tweak.name}", _work, on_done=_done)
 
     def run_tweaks_batch(self, tweaks: list[Tweak], revert: bool = False) -> None:
         chosen = [t for t in tweaks if self.tweak_checked.get(t.id, False)]
         if not chosen:
-            self.log("Tidak ada tweak yang dipilih di halaman ini.")
+            self.show_toast("Pilih minimal satu tweak di halaman ini.", "warning")
             return
         dry = self.dry_run
         mode = "Revert" if revert else "Apply"
 
         def _work(log_fn):
             res = TweakExecutor(dry_run=dry, log_cb=log_fn).run_tweaks(chosen, revert=revert, session_label=f"{mode} {len(chosen)} tweaks")
-            log_fn(f"Batch {mode} selesai: {res.succeeded} OK, {res.failed} gagal.")
+            msg = f"Batch {mode} selesai: {res.succeeded} OK, {res.failed} gagal."
+            log_fn(msg)
+            return msg
 
-        self._run_bg(f"{mode} {len(chosen)} tweaks", _work, on_done=lambda _: self._refresh_hardware_and_score())
+        def _done(msg: str) -> None:
+            self._refresh_hardware_and_score()
+            self.show_toast(msg, "success")
+
+        self._run_bg(f"{mode} {len(chosen)} tweaks", _work, on_done=_done)
 
     def toggle_game_boost(self) -> None:
         dry = self.dry_run
@@ -658,9 +791,10 @@ class MainWindow(QMainWindow):
             return self.booster.activate_boost(dry_run=dry, log_cb=log_fn)
 
         def _done(_res):
-            self.booster_view.boost_title.setText("Game & Emulator Booster: ACTIVE ⚡")
-            self.booster_view.btn_activate_boost.setText("Boost Aktif (Klik untuk Restore)")
+            self.booster_view.boost_title.setText("Game & Emulator Booster: ACTIVE")
+            self.booster_view.btn_activate_boost.setText("Boost Aktif (Klik Restore)")
             self._refresh_hardware_and_score()
+            self.show_toast("Game & Emulator Boost AKTIF!", "success")
 
         self._run_bg("Game Boost", _work, on_done=_done)
 
@@ -672,8 +806,9 @@ class MainWindow(QMainWindow):
 
         def _done(_res):
             self.booster_view.boost_title.setText("Game & Emulator Booster: STANDBY")
-            self.booster_view.btn_activate_boost.setText("⚡ Boost Sekarang")
+            self.booster_view.btn_activate_boost.setText(" Boost Sekarang")
             self._refresh_hardware_and_score()
+            self.show_toast("Power plan dikembalikan seperti semula.", "info")
 
         self._run_bg("Restore Boost", _work, on_done=_done)
 
@@ -682,11 +817,13 @@ class MainWindow(QMainWindow):
         self._run_bg(
             f"Thermal {mode}",
             lambda log_fn: set_laptop_thermal_mode(mode, dry_run=dry, log_cb=log_fn),
+            on_done=lambda res: self.show_toast(res[1], "success"),
         )
 
     def kill_process(self, pid: int, on_done: Callable[[], None] | None = None) -> None:
         ok, msg = terminate_process(pid, dry_run=self.dry_run)
         self.log(msg)
+        self.show_toast(msg, "success" if ok else "warning")
         if ok and on_done:
             on_done()
 
@@ -704,6 +841,7 @@ class MainWindow(QMainWindow):
         self._run_bg(
             f"DNS {label}",
             lambda log_fn: TweakExecutor(dry_run=dry, log_cb=log_fn).run_tweaks([t], session_label=f"DNS {label}"),
+            on_done=lambda _: self.show_toast(f"DNS diubah ke {label}", "success"),
         )
 
     def run_ping_benchmark(self, callback: Callable[[list[dict[str, str]]], None]) -> None:
@@ -722,7 +860,7 @@ class MainWindow(QMainWindow):
     def remove_checked_appx(self) -> None:
         selected = [pkg for pkg, checked in self.appx_checked.items() if checked]
         if not selected:
-            self.log("Tidak ada aplikasi UWP yang dicentang.")
+            self.show_toast("Tidak ada aplikasi UWP yang dicentang.", "warning")
             return
         dry = self.dry_run
         t = Tweak(
@@ -737,43 +875,54 @@ class MainWindow(QMainWindow):
         self._run_bg(
             "AppX Removal",
             lambda log_fn: TweakExecutor(dry_run=dry, log_cb=log_fn).run_tweaks([t], session_label="AppX Debloat"),
+            on_done=lambda _: self.show_toast(f"Menghapus {len(selected)} aplikasi bloatware.", "success"),
         )
 
     def toggle_startup(self, hive: str, name: str, enabled: bool) -> None:
-        _, msg = set_startup_item_enabled(hive, name, enabled, dry_run=self.dry_run)
+        ok, msg = set_startup_item_enabled(hive, name, enabled, dry_run=self.dry_run)
         self.log(msg)
+        self.show_toast(msg, "success" if ok else "warning")
 
     def scan_junk_async(self, callback: Callable[[Any], None]) -> None:
         self._run_bg("Scan Junk", lambda _log: scan_junk(), on_done=callback)
 
     def clean_junk_async(self, keys: list[str], include_recycle_bin: bool, on_done: Callable[[], None]) -> None:
         if not keys and not include_recycle_bin:
-            self.log("Pilih minimal satu kategori sampah.")
+            self.show_toast("Pilih minimal satu kategori sampah.", "warning")
             return
         dry = self.dry_run
         self._run_bg(
             "Clean Junk",
             lambda log_fn: clean_junk(keys, include_recycle_bin=include_recycle_bin, dry_run=dry, log_cb=log_fn),
-            on_done=lambda _: on_done(),
+            on_done=lambda res: (on_done(), self.show_toast(f"Pembersihan selesai: ~{res.mb_freed} MB", "success")),
         )
 
-    def trim_ram_now(self) -> None:
-        self._run_bg("Trim RAM", lambda log_fn: trim_ram_working_sets(dry_run=self.dry_run, log_cb=log_fn))
-
     def run_repair(self, mode: str, title: str) -> None:
-        self._run_bg(title, lambda log_fn: run_system_repair(mode, dry_run=self.dry_run, log_cb=log_fn))
+        self._run_bg(
+            title,
+            lambda log_fn: run_system_repair(mode, dry_run=self.dry_run, log_cb=log_fn),
+            on_done=lambda res: self.show_toast(res[1], "success" if res[0] else "warning"),
+        )
 
     def action_restore_point(self) -> None:
-        self._run_bg("Restore Point", lambda log_fn: create_restore_point(dry_run=self.dry_run, log_cb=log_fn))
+        self._run_bg(
+            "Restore Point",
+            lambda log_fn: create_restore_point(dry_run=self.dry_run, log_cb=log_fn),
+            on_done=lambda res: self.show_toast(res[1], "success" if res[0] else "warning"),
+        )
 
     def action_backup_registry(self) -> None:
-        self._run_bg("Registry Backup", lambda log_fn: export_registry_backup(full=False, dry_run=self.dry_run, log_cb=log_fn))
+        self._run_bg(
+            "Registry Backup",
+            lambda log_fn: export_registry_backup(full=False, dry_run=self.dry_run, log_cb=log_fn),
+            on_done=lambda res: self.show_toast(res[1], "success" if res[0] else "warning"),
+        )
 
     def revert_session_path(self, path: str, on_done: Callable[[], None]) -> None:
         self._run_bg(
             "Revert Session",
             lambda log_fn: revert_session(path, dry_run=self.dry_run, log_cb=log_fn),
-            on_done=lambda _: on_done(),
+            on_done=lambda res: (on_done(), self.show_toast(res[1], "success" if res[0] else "warning")),
         )
 
 
