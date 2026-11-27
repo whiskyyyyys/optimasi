@@ -1,9 +1,10 @@
-"""Nuitka build script for Optimasi Windows (requires Python 3.11)."""
+"""Nuitka + Inno Setup 6 build script for Optimasi Windows (requires Python 3.11)."""
 
 from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -39,57 +40,70 @@ def ensure_icon(icon_path: Path) -> None:
 
 
 def _sanitized_env_without_external_gcc() -> dict[str, str]:
-    """Strip pre-installed MinGW/WinLibs GCC from PATH so Nuitka uses its managed WinLibs toolchain."""
     env = os.environ.copy()
     parts = env.get("PATH", "").split(os.pathsep)
-    filtered = [
-        p
-        for p in parts
-        if "mingw" not in p.lower() and "winlibs" not in p.lower()
-    ]
+    filtered = [p for p in parts if "mingw" not in p.lower() and "winlibs" not in p.lower()]
     env["PATH"] = os.pathsep.join(filtered)
     return env
 
 
-def build(standalone: bool = False, uac_admin: bool = False, force_managed_gcc: bool = False) -> int:
+def _find_iscc() -> Path | None:
+    candidates = [
+        Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
+        Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    on_path = shutil.which("ISCC")
+    return Path(on_path) if on_path else None
+
+
+def build_nuitka(uac_admin: bool = False, force_managed_gcc: bool = False) -> int:
     ensure_python_311()
     icon_path = ROOT / "assets" / "app.ico"
     ensure_icon(icon_path)
 
     dist_dir = ROOT / "dist"
     dist_dir.mkdir(exist_ok=True)
-    entry = ROOT / "src" / "optimasi" / "main.py"
 
+    # Clean previous standalone folder so Inno Setup only packages fresh files
+    target_dir = dist_dir / "OptimasiWindows"
+    if target_dir.exists():
+        shutil.rmtree(target_dir, ignore_errors=True)
+
+    entry = ROOT / "src" / "optimasi" / "main.py"
     cmd = [
         sys.executable,
         "-m",
         "nuitka",
-        "--standalone" if standalone else "--onefile",
+        "--standalone",
         "--mingw64",
         "--assume-yes-for-downloads",
-        "--enable-plugin=tk-inter",
+        "--enable-plugin=pyside6",
+        "--include-qt-plugins=sensible,styles,iconengines,imageformats,platforms",
         "--include-package=optimasi",
-        "--include-package-data=customtkinter",
         f"--include-data-dir={ROOT / 'assets'}=assets",
         "--windows-console-mode=disable",
         f"--windows-icon-from-ico={icon_path}",
         "--company-name=WhisXD",
         "--product-name=Optimasi Windows",
-        "--file-version=1.0.0.0",
-        "--product-version=1.0.0.0",
-        "--file-description=Windows Performance, Gaming, Privacy & Debloat Optimizer",
+        "--file-version=2.0.0.0",
+        "--product-version=2.0.0.0",
+        "--file-description=Modern Windows Performance, Laptop & Gaming Optimizer",
         f"--output-dir={dist_dir}",
         "--output-filename=OptimasiWindows.exe",
-        "--remove-output",
+        str(entry),
     ]
     if uac_admin:
         cmd.append("--windows-uac-admin")
-    cmd.append(str(entry))
+    cmd.append("--remove-output")
 
     env = _sanitized_env_without_external_gcc() if force_managed_gcc else os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "src")
 
-    print("Running Nuitka build:")
+    print("Running Nuitka standalone build:")
     print(" ".join(cmd))
     proc = subprocess.run(cmd, cwd=str(ROOT), env=env)
     if proc.returncode != 0 and not force_managed_gcc:
@@ -97,16 +111,47 @@ def build(standalone: bool = False, uac_admin: bool = False, force_managed_gcc: 
         env = _sanitized_env_without_external_gcc()
         env["PYTHONPATH"] = str(ROOT / "src")
         proc = subprocess.run(cmd, cwd=str(ROOT), env=env)
+
+    if proc.returncode != 0:
+        return proc.returncode
+
+    # Normalize Nuitka main.dist -> dist/OptimasiWindows
+    main_dist = dist_dir / "main.dist"
+    if main_dist.exists():
+        if target_dir.exists():
+            shutil.rmtree(target_dir, ignore_errors=True)
+        main_dist.rename(target_dir)
+
+    return 0
+
+
+def build_installer() -> int:
+    iscc = _find_iscc()
+    iss_file = ROOT / "installer" / "OptimasiWindows.iss"
+    if not iscc:
+        print("WARNING: Inno Setup 6 (ISCC.exe) not found; skipping .exe installer creation.")
+        return 0
+    if not iss_file.exists():
+        print(f"ERROR: Missing installer script {iss_file}")
+        return 1
+    print(f"\nBuilding Windows Installer with {iscc}...")
+    proc = subprocess.run([str(iscc), str(iss_file)], cwd=str(ROOT))
     return proc.returncode
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Compile Optimasi Windows with Nuitka + Python 3.11")
-    parser.add_argument("--standalone", action="store_true", help="Build standalone folder instead of single-file .exe")
+    parser = argparse.ArgumentParser(description="Compile Optimasi Windows with Nuitka + Inno Setup 6")
     parser.add_argument("--uac-admin", action="store_true", help="Embed Windows UAC admin manifest in exe")
     parser.add_argument("--managed-gcc", action="store_true", help="Force Nuitka-managed WinLibs GCC")
+    parser.add_argument("--skip-installer", action="store_true", help="Skip Inno Setup packaging")
     args = parser.parse_args()
-    return build(standalone=args.standalone, uac_admin=args.uac_admin, force_managed_gcc=args.managed_gcc)
+
+    rc = build_nuitka(uac_admin=args.uac_admin, force_managed_gcc=args.managed_gcc)
+    if rc != 0:
+        return rc
+    if not args.skip_installer:
+        return build_installer()
+    return 0
 
 
 if __name__ == "__main__":

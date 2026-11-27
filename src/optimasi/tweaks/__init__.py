@@ -1,4 +1,4 @@
-"""Aggregated Windows optimization tweaks catalog and one-click presets."""
+"""Aggregated Windows optimization tweaks catalog and tailored presets."""
 
 from __future__ import annotations
 
@@ -32,14 +32,27 @@ TWEAK_BY_ID: dict[str, Tweak] = {t.id: t for t in ALL_TWEAKS}
 
 PRESETS: list[Preset] = [
     Preset(
-        id="safe_daily",
-        name="Safe Daily Driver",
-        badge="RECOMMENDED",
-        description="Safe privacy, AI/Edge debloat, NTFS/RAM polish, telemetry cleanup, and snappy UI with zero risky changes.",
+        id="laptop_pro",
+        name="Laptop Ryzen/iGPU Pro",
+        badge="BEST FOR YOUR LAPTOP",
+        description=(
+            "Dirancang khusus untuk laptop modern (Ryzen 6000H / Intel + iGPU 16 GB RAM): "
+            "performa penuh saat colok charger, hemat baterai saat DC, optimasi AMD Radeon & Emulator (MuMuPlayer), "
+            "tetap menjaga Memory Compression, Wi-Fi, Bluetooth & Sleep aman."
+        ),
         tweak_ids=[
+            "cpu_laptop_ac_dc_smart",
             "cpu_disable_power_throttling",
-            "cpu_usb_pcie_power",
+            "cpu_win32_priority_gaming",
+            "cpu_amd_ryzen",
+            "gpu_hags_enable",
+            "gpu_windowed_optimizations",
             "gpu_disable_gamedvr",
+            "gpu_mmcss_gaming",
+            "gpu_amd_radeon",
+            "gpu_auto_game_boost",
+            "net_disable_nagle",
+            "net_tcp_gaming_stack",
             "net_qos_reserve",
             "priv_telemetry_diag",
             "priv_disable_ai_copilot",
@@ -57,10 +70,35 @@ PRESETS: list[Preset] = [
         ],
     ),
     Preset(
+        id="laptop_battery",
+        name="Laptop Cool & Battery Saver",
+        badge="COOL & QUIET",
+        description=(
+            "Menjaga suhu laptop tetap adem & kipas senyap (cap CPU 99% AC / 80% DC), "
+            "mematikan telemetry & background bloat Edge/Copilot agar baterai lebih awet."
+        ),
+        tweak_ids=[
+            "cpu_laptop_cool_silent",
+            "priv_telemetry_diag",
+            "priv_disable_ai_copilot",
+            "priv_debloat_edge",
+            "priv_ads_spotlight",
+            "priv_telemetry_tasks",
+            "ram_svchost_auto",
+            "storage_ntfs_perf",
+            "storage_disable_delivery_opt",
+            "sys_disable_bing_widgets",
+            "svc_disable_non_essential",
+        ],
+    ),
+    Preset(
         id="gaming_pro",
-        name="Gaming & Low Latency Pro",
-        badge="FPS + PING",
-        description="Safe Daily tweaks + Ultimate Performance power, unparked CPU cores, HAGS, MMCSS Gaming, Nagle/TCP fix, Raw Mouse & Auto-Game Boost.",
+        name="Gaming & Emulator Max FPS",
+        badge="FPS + LOW PING",
+        description=(
+            "Ultimate Performance, unparked CPU cores, HAGS, MMCSS Gaming, Nagle/TCP fix, "
+            "Raw Mouse 1:1, dan Auto-Game/Emulator Boost untuk FPS maksimal saat plugged-in."
+        ),
         tweak_ids=[
             "cpu_ultimate_power",
             "cpu_disable_core_parking",
@@ -91,41 +129,30 @@ PRESETS: list[Preset] = [
         ],
     ),
     Preset(
-        id="extreme",
-        name="Extreme / Potato PC Max FPS",
-        badge="AGGRESSIVE",
-        description="Gaming Pro + AFD socket buffers, Telemetry Hosts Blocker, Snappy UI (no animations), Disable Memory Compression & Hibernation.",
+        id="safe_daily",
+        name="Safe Daily Driver",
+        badge="ZERO RISK",
+        description=(
+            "Optimasi harian paling aman: matikan telemetry, AI Copilot, Edge bloat, Bing Search, "
+            "perbaiki NTFS/RAM, dan rapikan context menu Windows 11."
+        ),
         tweak_ids=[
-            "cpu_ultimate_power",
-            "cpu_disable_core_parking",
             "cpu_disable_power_throttling",
-            "cpu_win32_priority_gaming",
-            "cpu_disable_hibernation",
             "cpu_usb_pcie_power",
-            "gpu_hags_enable",
-            "gpu_windowed_optimizations",
             "gpu_disable_gamedvr",
-            "gpu_mmcss_gaming",
-            "gpu_auto_game_boost",
-            "net_disable_nagle",
-            "net_tcp_gaming_stack",
-            "net_afd_buffers",
-            "net_nic_power_saving",
             "net_qos_reserve",
             "priv_telemetry_diag",
             "priv_disable_ai_copilot",
             "priv_debloat_edge",
             "priv_ads_spotlight",
             "priv_telemetry_tasks",
-            "priv_hosts_blocker",
             "ram_svchost_auto",
             "ram_kernel_paging",
-            "ram_disable_compression",
             "storage_ntfs_perf",
             "storage_disable_delivery_opt",
+            "sys_classic_context_menu",
+            "sys_explorer_power_user",
             "sys_disable_bing_widgets",
-            "sys_snappy_ui",
-            "sys_raw_mouse_keyboard",
             "svc_disable_non_essential",
         ],
     ),

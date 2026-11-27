@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+
 from optimasi.tweaks.models import (
     AppxRemove,
     Cmd,
@@ -15,6 +17,28 @@ from optimasi.tweaks.models import (
 )
 
 CATEGORY_PRIVACY = "Privacy & Debloat"
+_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
+
+def get_installed_bloat_appx() -> set[str]:
+    """Return a set of SAFE_BLOAT_APPX package keys currently installed on this Windows PC."""
+    try:
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", "Get-AppxPackage | Select-Object -ExpandProperty Name"],
+            capture_output=True,
+            text=True,
+            timeout=12,
+            creationflags=_CREATE_NO_WINDOW,
+        )
+        installed_raw = {line.strip().lower() for line in (res.stdout or "").splitlines() if line.strip()}
+        matched: set[str] = set()
+        for pkg, _ in SAFE_BLOAT_APPX:
+            pkg_l = pkg.lower()
+            if any(pkg_l in name for name in installed_raw):
+                matched.add(pkg)
+        return matched
+    except Exception:
+        return set()
 
 TELEMETRY_DOMAINS = [
     "config.edge.skype.com",

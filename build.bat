@@ -23,14 +23,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [3/3] Compiling OptimasiWindows.exe with Nuitka (Python 3.11)...
+echo [3/3] Compiling Nuitka + Inno Setup Windows Installer (Python 3.11)...
 ".venv311\Scripts\python.exe" build_nuitka.py %*
 if errorlevel 1 (
-    echo ERROR: Nuitka build failed.
+    echo ERROR: Build failed.
     pause
     exit /b 1
 )
 
 echo.
-echo Build succeeded! Output: dist\OptimasiWindows.exe
+echo Build succeeded!
+echo - Standalone App: dist\OptimasiWindows\OptimasiWindows.exe
+echo - Windows Installer: dist\OptimasiWindows-Setup-2.0.0.exe
 pause

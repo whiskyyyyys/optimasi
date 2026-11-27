@@ -1,1 +1,1 @@
-"""CustomTkinter UI modules for Optimasi Windows."""
+"""PySide6 Fluent UI modules for Optimasi Windows."""

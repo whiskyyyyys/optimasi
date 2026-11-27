@@ -117,12 +117,14 @@ def _disable_nic_power_saving(dry_run: bool = False, log_cb: Callable[[str], Non
 
 
 def ping_endpoints(targets: list[tuple[str, str]] | None = None) -> list[dict[str, str]]:
-    """Run a quick 2-packet ping benchmark against popular DNS/gaming endpoints."""
+    """Run a quick 2-packet ping benchmark against DNS and SEA/Asia gaming endpoints."""
     endpoints = targets or [
-        ("Cloudflare", "1.1.1.1"),
+        ("Cloudflare DNS", "1.1.1.1"),
         ("Google DNS", "8.8.8.8"),
-        ("Quad9", "9.9.9.9"),
-        ("AdGuard", "94.140.14.14"),
+        ("Quad9 Security", "9.9.9.9"),
+        ("AdGuard DNS", "94.140.14.14"),
+        ("Singapore (SEA Gaming)", "103.10.124.1"),
+        ("Tokyo (East Asia)", "103.10.125.1"),
     ]
     results: list[dict[str, str]] = []
     for label, ip in endpoints:

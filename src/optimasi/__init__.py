@@ -1,8 +1,9 @@
 """Optimasi Windows - Modern Windows Performance, Gaming, Privacy & Debloat Optimizer."""
 
 APP_NAME = "Optimasi Windows"
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.0"
 APP_AUTHOR = "WhisXD"
-REPO_URL = "https://github.com/whiskyyyyys/optimasi"
+REPO_SLUG = "whiskyyyyys/optimasi"
+REPO_URL = f"https://github.com/{REPO_SLUG}"
 
-__all__ = ["APP_NAME", "APP_VERSION", "APP_AUTHOR", "REPO_URL"]
+__all__ = ["APP_NAME", "APP_VERSION", "APP_AUTHOR", "REPO_SLUG", "REPO_URL"]

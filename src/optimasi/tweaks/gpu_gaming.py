@@ -13,8 +13,9 @@ CATEGORY_GPU = "GPU & Gaming"
 
 
 def _discover_installed_game_exes() -> list[str]:
-    """Scan common Steam, Epic, Riot, Roblox, Battle.net, and EA install paths."""
+    """Scan common Steam, Epic, Riot, Roblox, Emulators (MuMuPlayer/BlueStacks/LDPlayer), and osu! paths."""
     user = os.environ.get("USERPROFILE", str(Path.home()))
+    local = os.environ.get("LOCALAPPDATA", str(Path(user) / "AppData" / "Local"))
     candidates = [
         r"C:\Program Files\Epic Games\Fortnite\FortniteGame\Binaries\Win64\FortniteClient-Win64-Shipping.exe",
         r"C:\Program Files\Epic Games\RocketLeague\Binaries\Win64\RocketLeague.exe",
@@ -29,11 +30,19 @@ def _discover_installed_game_exes() -> list[str]:
         r"C:\Riot Games\VALORANT\live\VALORANT.exe",
         r"C:\Riot Games\VALORANT\live\ShooterGame\Binaries\Win64\VALORANT-Win64-Shipping.exe",
         r"C:\Program Files\Genshin Impact\Genshin Impact Game\GenshinImpact.exe",
-        str(Path(user) / "AppData" / "Local" / "osu!" / "osu!.exe"),
+        str(Path(local) / "osu!" / "osu!.exe"),
+        # Android Emulators (MuMuPlayer, BlueStacks, LDPlayer, Nox)
+        r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\shell\MuMuPlayer.exe",
+        r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\nx_main\MuMuNxMain.exe",
+        r"C:\Program Files\Netease\MuMu Player 12\shell\MuMuPlayer.exe",
+        r"C:\Program Files\Netease\MuMu Player 12\nx_main\MuMuNxMain.exe",
+        r"C:\Program Files\BlueStacks_nxt\HD-Player.exe",
+        r"C:\LDPlayer\LDPlayer9\dnplayer.exe",
+        r"C:\Program Files (x86)\Nox\bin\Nox.exe",
     ]
     for base in [
         Path(r"C:\Program Files (x86)\Roblox\Versions"),
-        Path(user) / "AppData" / "Local" / "Roblox" / "Versions",
+        Path(local) / "Roblox" / "Versions",
     ]:
         if base.exists():
             for ver in sorted(base.glob("version-*"), reverse=True):
