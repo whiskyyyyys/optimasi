@@ -1,0 +1,33 @@
+# Python & virtualenvs
+.venv/
+.venv311/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Nuitka & build outputs
+build/
+dist/
+*.build/
+*.dist/
+*.onefile-build/
+*.exe
+*.spec
+
+# Backups, logs, temporary exports
+backups/
+OptimasiBackups/
+*.log
+*.reg
+selftest*.json
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

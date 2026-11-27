@@ -1,0 +1,46 @@
+name: Build Optimasi Windows (Python 3.11 + Nuitka)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e . --no-deps
+
+      - name: Run pytest
+        run: pytest -v
+
+      - name: Compile with Nuitka
+        run: python build_nuitka.py --managed-gcc
+
+      - name: Verify compiled binary self-test
+        run: |
+          $p = Start-Process -FilePath "dist\OptimasiWindows.exe" -ArgumentList "--self-test-out", "dist\selftest.json" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+          Get-Content dist\selftest.json
+          Remove-Item dist\selftest.json
+
+      - name: Upload Windows Executable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OptimasiWindows-exe
+          path: dist/OptimasiWindows.exe
+          if-no-files-found: error
