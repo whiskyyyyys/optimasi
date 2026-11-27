@@ -60,7 +60,7 @@ def _find_iscc() -> Path | None:
     return Path(on_path) if on_path else None
 
 
-def build_nuitka(uac_admin: bool = False, force_managed_gcc: bool = False) -> int:
+def build_nuitka(uac_admin: bool = True, force_managed_gcc: bool = False) -> int:
     ensure_python_311()
     icon_path = ROOT / "assets" / "app.ico"
     ensure_icon(icon_path)
@@ -89,8 +89,8 @@ def build_nuitka(uac_admin: bool = False, force_managed_gcc: bool = False) -> in
         f"--windows-icon-from-ico={icon_path}",
         "--company-name=WhisXD",
         "--product-name=Optimasi Windows",
-        "--file-version=2.1.1.0",
-        "--product-version=2.1.1.0",
+        "--file-version=2.1.2.0",
+        "--product-version=2.1.2.0",
         "--file-description=Modern Windows Performance, Laptop & Gaming Optimizer",
         f"--output-dir={dist_dir}",
         "--output-filename=OptimasiWindows.exe",
@@ -141,12 +141,12 @@ def build_installer() -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compile Optimasi Windows with Nuitka + Inno Setup 6")
-    parser.add_argument("--uac-admin", action="store_true", help="Embed Windows UAC admin manifest in exe")
+    parser.add_argument("--no-uac-admin", action="store_true", help="Do not embed Windows UAC admin manifest in exe")
     parser.add_argument("--managed-gcc", action="store_true", help="Force Nuitka-managed WinLibs GCC")
     parser.add_argument("--skip-installer", action="store_true", help="Skip Inno Setup packaging")
     args = parser.parse_args()
 
-    rc = build_nuitka(uac_admin=args.uac_admin, force_managed_gcc=args.managed_gcc)
+    rc = build_nuitka(uac_admin=not args.no_uac_admin, force_managed_gcc=args.managed_gcc)
     if rc != 0:
         return rc
     if not args.skip_installer:

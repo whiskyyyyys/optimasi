@@ -1,7 +1,7 @@
 """Optimasi Windows - Modern Windows Performance, Gaming, Privacy & Debloat Optimizer."""
 
 APP_NAME = "Optimasi Windows"
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.1.2"
 APP_AUTHOR = "WhisXD"
 REPO_SLUG = "whiskyyyyys/optimasi"
 REPO_URL = f"https://github.com/{REPO_SLUG}"
