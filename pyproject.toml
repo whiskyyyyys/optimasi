@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "optimasi-windows"
-version = "2.0.0"
+version = "2.0.1"
 description = "Modern Windows 10/11 Performance, Laptop, Gaming, Privacy & Network Optimizer compiled with Python 3.11 + Nuitka"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"

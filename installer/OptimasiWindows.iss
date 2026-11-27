@@ -1,6 +1,6 @@
 ; Inno Setup 6 script for Optimasi Windows Installer
 #define MyAppName "Optimasi Windows"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.0.1"
 #define MyAppPublisher "WhisXD"
 #define MyAppURL "https://github.com/whiskyyyyys/optimasi"
 #define MyAppExeName "OptimasiWindows.exe"

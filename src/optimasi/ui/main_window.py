@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
         ("backup", "🔄  Backup & Updates"),
     ]
 
-    def __init__(self, start_dry_run: bool = False):
+    def __init__(self, start_dry_run: bool = False, enable_auto_update: bool = True):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(1260, 810)
@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
         self._refresh_hardware_and_score()
         self._start_telemetry_timer()
 
-        if self.settings.get("auto_check_updates", True):
+        if enable_auto_update and self.settings.get("auto_check_updates", True):
             QTimer.singleShot(1200, lambda: self.check_updates_async(manual=False))
 
     # ------------------------------------------------------------------
@@ -243,22 +243,7 @@ class MainWindow(QMainWindow):
         banner_wrap.addWidget(self.update_banner)
         right_col.addLayout(banner_wrap)
 
-        # Page Router
-        self.stack = QStackedWidget()
-        self.dashboard_view = DashboardView(self)
-        self.booster_view = BoosterView(self)
-        self.category_view = CategoryView(self)
-        self.cleaner_view = CleanerView(self)
-        self.backup_view = BackupUpdatesView(self)
-
-        self.stack.addWidget(self.dashboard_view)
-        self.stack.addWidget(self.booster_view)
-        self.stack.addWidget(self.category_view)
-        self.stack.addWidget(self.cleaner_view)
-        self.stack.addWidget(self.backup_view)
-        right_col.addWidget(self.stack, 1)
-
-        # Console Drawer
+        # Console Drawer (built before views so status_lbl & console always exist)
         console_wrap = QFrame()
         console_wrap.setStyleSheet("background-color: #0E1422; border-top: 1px solid #1C263B;")
         c_lay = QVBoxLayout(console_wrap)
@@ -286,6 +271,21 @@ class MainWindow(QMainWindow):
         self.console.setReadOnly(True)
         self.console.setFixedHeight(105)
         c_lay.addWidget(self.console)
+
+        # Page Router
+        self.stack = QStackedWidget()
+        self.dashboard_view = DashboardView(self)
+        self.booster_view = BoosterView(self)
+        self.category_view = CategoryView(self)
+        self.cleaner_view = CleanerView(self)
+        self.backup_view = BackupUpdatesView(self)
+
+        self.stack.addWidget(self.dashboard_view)
+        self.stack.addWidget(self.booster_view)
+        self.stack.addWidget(self.category_view)
+        self.stack.addWidget(self.cleaner_view)
+        self.stack.addWidget(self.backup_view)
+        right_col.addWidget(self.stack, 1)
         right_col.addWidget(console_wrap)
 
         main_lay.addLayout(right_col, 1)
@@ -334,10 +334,24 @@ class MainWindow(QMainWindow):
         self.activateWindow()
         self.raise_()
 
-    def _quit_completely(self) -> None:
+    def shutdown(self) -> None:
+        """Stop timers and wait cleanly for background QThreads before exit."""
         self._force_quit = True
-        if self.tray:
+        if hasattr(self, "telemetry_timer"):
+            self.telemetry_timer.stop()
+        app = QApplication.instance()
+        for w in list(self.active_workers):
+            while w.isRunning():
+                if app:
+                    app.processEvents()
+                if w.wait(100):
+                    break
+        self.active_workers.clear()
+        if getattr(self, "tray", None):
             self.tray.hide()
+
+    def _quit_completely(self) -> None:
+        self.shutdown()
         QApplication.quit()
 
     def closeEvent(self, event) -> None:
@@ -355,6 +369,7 @@ class MainWindow(QMainWindow):
                 2500,
             )
             return
+        self.shutdown()
         super().closeEvent(event)
 
     # ------------------------------------------------------------------
@@ -362,7 +377,8 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def log(self, msg: str) -> None:
         stamp = datetime.now().strftime("%H:%M:%S")
-        self.console.appendPlainText(f"[{stamp}] {msg}")
+        if hasattr(self, "console"):
+            self.console.appendPlainText(f"[{stamp}] {msg}")
 
     def update_setting(self, key: str, value: Any) -> None:
         self.settings[key] = value
@@ -385,19 +401,22 @@ class MainWindow(QMainWindow):
         fn: Callable[[Callable[[str], None]], Any],
         on_done: Callable[[Any], None] | None = None,
     ) -> None:
-        self.status_lbl.setText(f"Running: {label}...")
+        if hasattr(self, "status_lbl"):
+            self.status_lbl.setText(f"Running: {label}...")
         worker = _TaskWorker(fn)
         worker.log_line.connect(self.log)
 
         def _ok(res: Any) -> None:
-            self.status_lbl.setText("Ready")
+            if hasattr(self, "status_lbl"):
+                self.status_lbl.setText("Ready")
             if on_done:
                 on_done(res)
             if worker in self.active_workers:
                 self.active_workers.remove(worker)
 
         def _err(err: str) -> None:
-            self.status_lbl.setText("Ready")
+            if hasattr(self, "status_lbl"):
+                self.status_lbl.setText("Ready")
             self.log(f"ERROR ({label}): {err}")
             if worker in self.active_workers:
                 self.active_workers.remove(worker)
@@ -426,6 +445,8 @@ class MainWindow(QMainWindow):
             self.booster_view.refresh_processes()
             self.stack.setCurrentWidget(self.booster_view)
         elif page_id == "cleaner":
+            if not self.cleaner_view._scanned_once:
+                self.cleaner_view.refresh_scan()
             self.stack.setCurrentWidget(self.cleaner_view)
         elif page_id == "backup":
             self.backup_view.refresh_sessions()

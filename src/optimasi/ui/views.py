@@ -587,12 +587,21 @@ class CleanerView(QWidget):
         outer.addWidget(_scroll_wrap(body))
 
         self.junk_checks: dict[str, QCheckBox] = {}
-        self.refresh_scan()
+        self.junk_checked_state: dict[str, bool] = {}
+        self._scanned_once = False
 
     def refresh_scan(self) -> None:
+        self._scanned_once = True
         self.ctrl.scan_junk_async(self._render_junk_rows)
 
     def _render_junk_rows(self, stats) -> None:
+        for key, cb in list(self.junk_checks.items()):
+            try:
+                self.junk_checked_state[key] = cb.isChecked()
+            except RuntimeError:
+                pass
+        self.junk_checks.clear()
+
         while self.junk_container.count():
             item = self.junk_container.takeAt(0)
             if item.widget():
@@ -607,10 +616,11 @@ class CleanerView(QWidget):
             rl.setContentsMargins(12, 8, 14, 8)
 
             default_on = s.key in ("user_temp", "windows_temp", "shader_cache", "crash_wer")
-            prev = self.junk_checks.get(s.key)
-            checked = prev.isChecked() if prev else default_on
+            checked = self.junk_checked_state.get(s.key, default_on)
+            self.junk_checked_state[s.key] = checked
             cb = QCheckBox(f"{s.label} — {s.description}")
             cb.setChecked(checked)
+            cb.toggled.connect(lambda val, k=s.key: self.junk_checked_state.__setitem__(k, val))
             self.junk_checks[s.key] = cb
             rl.addWidget(cb, 1)
 
@@ -620,7 +630,7 @@ class CleanerView(QWidget):
             self.junk_container.addWidget(row_card)
 
     def clean_selected(self) -> None:
-        keys = [k for k, cb in self.junk_checks.items() if cb.isChecked()]
+        keys = [k for k, checked in self.junk_checked_state.items() if checked]
         self.ctrl.clean_junk_async(keys, self.recycle_cb.isChecked(), on_done=self.refresh_scan)
 
 

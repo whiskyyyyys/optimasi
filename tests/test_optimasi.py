@@ -197,5 +197,23 @@ def test_cli_self_test_out(tmp_path: Path) -> None:
     assert data["python_major_minor"] == [3, 11]
     assert data["dry_run_ok"] is True
     assert data["pyside6_ok"] is True
+    assert data["gui_init_ok"] is True
     assert data["updater_semver_ok"] is True
     assert data["tweak_count"] == len(ALL_TWEAKS)
+
+
+def test_gui_mainwindow_all_pages_render() -> None:
+    from PySide6.QtWidgets import QApplication
+    from optimasi.ui.main_window import MainWindow
+    from optimasi.ui.style import DARK_QSS
+
+    app = QApplication.instance() or QApplication([])
+    app.setStyle("Fusion")
+    app.setStyleSheet(DARK_QSS)
+    win = MainWindow(start_dry_run=True, enable_auto_update=False)
+    for page_id, _ in MainWindow.NAV_ITEMS:
+        win.switch_page(page_id)
+        app.processEvents()
+    win.shutdown()
+    win.close()
+    app.processEvents()
